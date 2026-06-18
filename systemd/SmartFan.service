@@ -1,0 +1,14 @@
+[Unit]
+Description=Sequent Microsystems Smart HAT Service
+After=network.target
+
+[Service]
+ExecStart=/home/pi/smart_hat_venv/bin/python3 /home/pi/SmartFan-rpi/python/examples/loop.py -t 30 -v
+WorkingDirectory=/home/pi/SmartFan-rpi/python/examples/
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=pi
+
+[Install]
+WantedBy=multi-user.target

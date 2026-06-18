@@ -1,0 +1,18 @@
+[Unit]
+Description=ThermoSquid Pi Temperature Service
+After=network.target
+
+[Service]
+ExecStart=/bin/bash -l -c '/usr/bin/node /home/pi/git-repos/DoorsAndCamera_ColdBox/servers/pi_temperature_server/server.js'
+WorkingDirectory=/home/pi/git-repos/DoorsAndCamera_ColdBox/servers/pi_temperature_server
+StandardOutput=journal
+StandardError=journal
+Restart=always
+RestartSec=5
+User=pi
+Environment=NODE_ENV=production
+Environment=PATH=/home/pi/motor_env/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=PYTHONPATH=/home/pi/motor_env/lib/python3.9/site-packages
+
+[Install]
+WantedBy=multi-user.target

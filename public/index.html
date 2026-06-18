@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+  <link rel="stylesheet" href="./css/all.css">
+  <link rel="stylesheet" href="./css/index.css">
+  <title>Door and Camera Control</title>
+</head>
+<body>
+  <div class="app-wrapper">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-content">
+        <span style="display:grid;grid-template-columns: auto 1fr auto;gap:0.25em;justify-content: center;align-items: center;">
+          <img src="img/thermoSquidLogo.png" alt="ThermoSquid Logo" class="header-logo">
+          <h3 class="app-title">Door and Camera Control</h3>
+          <nav class="header-nav">
+            <a href="/image_manager.html" class="nav-link" title="Image Gallery" style="margin-left:1em;" aria-label="View Image Gallery">
+              <i class="fa-solid fa-images"></i>
+              <span>Gallery</span>
+            </a>
+          </nav>
+        </span>
+      </div>
+    </header>
+    <!-- Status Message -->
+    <div id="status-message" class="status-message"></div>
+    <!-- Main Layout -->
+    <main class="main-layout">
+      <!-- Grid Container -->
+      <!-- <div class="layout-grid">
+        
+        <!-- Camera Row -->
+        <div class="camera-row">
+          <!-- Front Camera -->
+          <section class="grid-item camera-section front-camera-section" data-camera="front">
+            <div class="camera-panel front-camera">
+              <div class="video-container">
+                <div class="video-wrapper">
+                  <img id="front-video-stream" class="camera-feed" alt="Front camera stream" style="display: none;" />
+                  <canvas id="front-canvas" class="overlay-canvas" style="display: none;"></canvas>
+                </div>
+                <!-- FIXED: Capture button nested inside video-container for overlay -->
+                <button id="capture-front-image" class="control-btn primary disabled" data-camera="front" data-action="capture" disabled aria-label="Capture front camera image">
+                  <i class="fa-solid fa-camera"></i>
+                  <span>Capture</span>
+                </button>
+                <button id="record-front-video" class="control-btn record disabled" data-camera="front" data-action="record" disabled aria-label="Record front camera video">
+                  <i class="fa-solid fa-video"></i>
+                  <span>Record</span>
+                </button>
+              </div>
+              <!-- UPDATED: camera-controls now only for pause/resume, centered below -->
+              <div class="camera-controls">
+                <button id="toggle-front-stream" class="control-btn secondary" data-camera="front" data-action="toggle" aria-label="Pause or resume front camera stream">
+                  <i class="fa-solid fa-pause"></i>
+                  <span>Pause Stream</span>
+                </button>
+                <button id="settings-front" class="control-btn secondary" data-camera="front" data-action="settings" aria-label="Camera settings">
+                  <i class="fa-solid fa-cog"></i>
+                  <span>Settings</span>
+                </button>
+              </div>
+          
+<!-- FRONT CAMERA SETTINGS MENU -->
+<div class="camera-settings-menu" id="front-settings-menu" style="display: none;">
+  <div class="settings-grid">
+    <div class="settings-column">
+      <label>Resolution <select id="front-resolution">
+        <option value="640x480">640×480</option>
+        <option value="1280x720">1280×720</option>
+        <option value="1920x1080">1920×1080</option>
+        <option value="1536x864" selected>1536×864</option>
+      </select></label>
+
+      <label>Framerate <select id="front-framerate">
+        <option value="10">10 fps</option>
+        <option value="15">15 fps</option>
+        <option value="30" selected>30 fps</option>
+        <option value="60">60 fps</option>
+      </select></label>
+
+      <label>Brightness (-1 to 1)
+        <input type="number" id="front-brightness" min="-1" max="1" step="0.05" value="0">
+      </label>
+
+      <label>Contrast (0–32)
+        <input type="number" id="front-contrast" min="0" max="32" step="0.1" value="1">
+      </label>
+
+      <label>Sharpness (0–16)
+        <input type="number" id="front-sharpness" min="0" max="16" step="0.1" value="1">
+      </label>
+
+      <label>Saturation (0–32)
+        <input type="number" id="front-saturation" min="0" max="32" step="0.1" value="1">
+      </label>
+
+      <label>EV (-10 to 10)
+        <input type="number" id="front-ev" min="-10" max="10" step="1" value="0">
+      </label>
+    </div>
+
+    <div class="settings-column">
+      <label>Shutter (µs)
+        <input type="number" id="front-shutter" min="0" step="1" value="0">
+      </label>
+
+      <label>Gain
+        <input type="number" id="front-gain" min="0" step="0.1" value="0">
+      </label>
+
+      <label>Metering <select id="front-metering">
+        <option value="centre">Centre</option>
+        <option value="spot">Spot</option>
+        <option value="average">Average</option>
+        <option value="custom">Custom</option>
+      </select></label>
+
+      <label>Exposure <select id="front-exposure">
+        <option value="normal">Normal</option>
+        <option value="sport">Sport</option>
+        <option value="long">Long</option>
+      </select></label>
+
+      <label>AWB <select id="front-awb">
+        <option value="auto">Auto</option>
+        <option value="incandescent">Incandescent</option>
+        <option value="tungsten">Tungsten</option>
+        <option value="fluorescent">Fluorescent</option>
+        <option value="indoor">Indoor</option>
+        <option value="daylight">Daylight</option>
+        <option value="cloudy">Cloudy</option>
+        <option value="off">Manual</option>
+      </select></label>
+
+      <label>AWB Red Gain
+        <input type="number" id="front-awb-red" step="0.1" value="0">
+      </label>
+
+      <label>AWB Blue Gain
+        <input type="number" id="front-awb-blue" step="0.1" value="0">
+      </label>
+
+      <label>Denoise <select id="front-denoise">
+        <option value="auto">Auto</option>
+        <option value="off">Off</option>
+        <option value="cdn_off">CDN Off</option>
+        <option value="cdn_fast">CDN Fast</option>
+        <option value="cdn_hq">CDN HQ</option>
+      </select></label>
+    </div>
+  </div>
+
+  <button class="apply-settings-btn" id="apply-front-settings">
+    Apply Settings
+  </button>
+</div>
+              <div class="camera-settings">
+                <span style="display:grid;grid-template-columns: 40% 60%;gap: 0.5em;vertical-align: central;justify-content: center;align-items: center;">
+                  <span>
+                    <label for="front-timestamp">
+                      <input id="front-timestamp" type="checkbox" checked aria-label="Add timestamp to front camera images">
+                      Add Timestamp
+                    </label>
+                  </span>
+                  <span>
+                    <label for="custom-file-name-front">Custom Name:
+                      <input id="custom-file-name-front" type="text" placeholder="Optional file name" maxlength="50" aria-label="Custom filename for front camera captures">
+                    </label>
+                  </span>
+                </span>
+              </div>
+            </div>
+          </section>
+          <!-- Back Camera -->
+          <section class="grid-item camera-section back-camera-section" data-camera="back">
+            <div class="camera-panel back-camera">
+              <div class="video-container">
+                <div class="video-wrapper">
+                  <img id="back-video-stream" class="camera-feed" alt="Back camera stream" style="display: none;" />
+                  <canvas id="back-canvas" class="overlay-canvas" style="display: none;"></canvas>
+                </div>
+                <!-- FIXED: Capture button nested inside video-container for overlay -->
+                <button id="capture-back-image" class="control-btn primary disabled" data-camera="back" data-action="capture" disabled aria-label="Capture back camera image">
+                  <i class="fa-solid fa-camera"></i>
+                  <span>Capture</span>
+                </button>
+                <button id="record-back-video" class="control-btn record disabled" data-camera="back" data-action="record" disabled aria-label="Record back camera video">
+                  <i class="fa-solid fa-video"></i>
+                  <span>Record</span>
+                </button>
+              </div>
+              <!-- UPDATED: camera-controls now only for pause/resume, centered below -->
+              <div class="camera-controls">
+                <button id="toggle-back-stream" class="control-btn secondary" data-camera="back" data-action="toggle" aria-label="Pause or resume back camera stream">
+                  <i class="fa-solid fa-pause"></i>
+                  <span>Pause Stream</span>
+                </button>
+                <button id="settings-back" class="control-btn secondary" data-camera="back" data-action="settings" aria-label="Camera settings">
+                  <i class="fa-solid fa-cog"></i>
+                  <span>Settings</span>
+                </button>
+              </div>
+              <div class="camera-settings-menu" id="back-settings-menu" style="display: none;">
+  <div class="settings-grid">
+    <div class="settings-column">
+      <label>Resolution <select id="back-resolution">
+        <option value="640x480">640×480</option>
+        <option value="1280x720">1280×720</option>
+        <option value="1920x1080">1920×1080</option>
+        <option value="1536x864" selected>1536×864</option>
+      </select></label>
+
+      <label>Framerate <select id="back-framerate">
+        <option value="10">10 fps</option>
+        <option value="15">15 fps</option>
+        <option value="30" selected>30 fps</option>
+        <option value="60">60 fps</option>
+      </select></label>
+
+      <label>Brightness (-1 to 1)
+        <input type="number" id="back-brightness" min="-1" max="1" step="0.05" value="0">
+      </label>
+
+      <label>Contrast (0–32)
+        <input type="number" id="back-contrast" min="0" max="32" step="0.1" value="1">
+      </label>
+
+      <label>Sharpness (0–16)
+        <input type="number" id="back-sharpness" min="0" max="16" step="0.1" value="1">
+      </label>
+
+      <label>Saturation (0–32)
+        <input type="number" id="back-saturation" min="0" max="32" step="0.1" value="1">
+      </label>
+
+      <label>EV (-10 to 10)
+        <input type="number" id="back-ev" min="-10" max="10" step="1" value="0">
+      </label>
+    </div>
+
+    <div class="settings-column">
+      <label>Shutter (µs)
+        <input type="number" id="back-shutter" min="0" step="1" value="0">
+      </label>
+
+      <label>Gain
+        <input type="number" id="back-gain" min="0" step="0.1" value="0">
+      </label>
+
+      <label>Metering <select id="back-metering">
+        <option value="centre">Centre</option>
+        <option value="spot">Spot</option>
+        <option value="average">Average</option>
+        <option value="custom">Custom</option>
+      </select></label>
+
+      <label>Exposure <select id="back-exposure">
+        <option value="normal">Normal</option>
+        <option value="sport">Sport</option>
+        <option value="long">Long</option>
+      </select></label>
+
+      <label>AWB <select id="back-awb">
+        <option value="auto">Auto</option>
+        <option value="incandescent">Incandescent</option>
+        <option value="tungsten">Tungsten</option>
+        <option value="fluorescent">Fluorescent</option>
+        <option value="indoor">Indoor</option>
+        <option value="daylight">Daylight</option>
+        <option value="cloudy">Cloudy</option>
+        <option value="off">Manual</option>
+      </select></label>
+
+      <label>AWB Red Gain
+        <input type="number" id="back-awb-red" step="0.1" value="0">
+      </label>
+
+      <label>AWB Blue Gain
+        <input type="number" id="back-awb-blue" step="0.1" value="0">
+      </label>
+
+      <label>Denoise <select id="back-denoise">
+        <option value="auto">Auto</option>
+        <option value="off">Off</option>
+        <option value="cdn_off">CDN Off</option>
+        <option value="cdn_fast">CDN Fast</option>
+        <option value="cdn_hq">CDN HQ</option>
+      </select></label>
+    </div>
+  </div>
+
+  <button class="apply-settings-btn" id="apply-back-settings">
+    Apply Settings
+  </button>
+</div>
+              <div class="camera-settings">
+                <span style="display:grid;grid-template-columns: 40% 60%;gap: 0.5em;vertical-align: central;justify-content: center;align-items: center;">
+                  <span>
+                    <label for="back-timestamp">
+                      <input id="back-timestamp" type="checkbox" checked aria-label="Add timestamp to back camera images">
+                      Add Timestamp
+                    </label>
+                  </span>
+                  <span>
+                    <label for="custom-file-name-back">Custom Name:
+                      <input id="custom-file-name-back" type="text" placeholder="Optional file name" maxlength="50" aria-label="Custom filename for back camera captures">
+                    </label>
+                  </span>
+                </span>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+    <div id="camera-modal" class="camera-modal-overlay" style="display: none;">
+      <div class="camera-modal-content">
+        <div class="camera-modal-header">
+          <h4 id="modal-camera-title" class="modal-title"></h4>
+          <button id="close-modal-btn" class="modal-close-btn" title="Close" aria-label="Close modal">
+            <i class="fa-solid fa-times"></i>
+          </button>
+        </div>
+        <div class="camera-modal-video-container">
+          <img id="modal-video-stream" class="modal-camera-feed" alt="Large camera view" />
+          <canvas id="modal-canvas" class="modal-overlay-canvas"></canvas>
+          <div class="modal-controls">
+            <button id="modal-capture-btn" class="modal-capture-btn" aria-label="Capture from modal">
+              <i class="fa-solid fa-camera"></i>
+              <span>Capture</span>
+            </button>
+            <button id="modal-record-btn" class="modal-record-btn" aria-label="Record video in modal">
+              <i class="fa-solid fa-video"></i>
+              <span>Record</span>
+            </button>
+            <button id="modal-toggle-btn" class="modal-toggle-btn" aria-label="Pause or resume stream in modal">
+              <i class="fa-solid fa-pause"></i>
+              <span>Pause</span>
+            </button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <label class="modal-timestamp-toggle" >
+            <input type="checkbox" id="modal-timestamp" checked aria-label="Show timestamp in modal">
+            <span>Show Timestamp</span>
+          </label>
+          <label class="modal-filename-input">
+            <span>File Name:</span>
+            <input type="text" id="modal-filename" placeholder="Optional name" maxlength="50" aria-label="Custom filename for modal capture">
+          </label>
+        </div>
+      </div>
+    </div>
+    <!-- Controls Toggle -->
+    <footer class="controls-footer">
+      <label class="enable-switch">
+        <input type="checkbox" id="control-enable" aria-label="Enable auto door controls">
+        <span>Enable Auto Controls</span>
+      </label>
+    </footer>  
+  </div>
+  <script type="module" src="js/index.js"></script>
+</body>
+</html>

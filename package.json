@@ -1,0 +1,41 @@
+{
+  "name": "doorsandcamera_coldbox",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NSaundersDev/DoorsAndCamera_ColdBox.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/NSaundersDev/DoorsAndCamera_ColdBox/issues"
+  },
+  "homepage": "https://github.com/NSaundersDev/DoorsAndCamera_ColdBox#readme",
+  "dependencies": {
+    "20": "^1.0.0",
+    "@fortawesome/fontawesome-free": "^6.7.2",
+    "@fortawesome/fontawesome-svg-core": "^6.7.2",
+    "@fortawesome/free-brands-svg-icons": "^6.7.2",
+    "@fortawesome/free-regular-svg-icons": "^6.7.2",
+    "@fortawesome/free-solid-svg-icons": "^6.7.2",
+    "archiver": "^7.0.1",
+    "child_process": "^1.0.2",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "ffmpeg-static": "^5.3.0",
+    "fs": "^0.0.1-security",
+    "jimp": "^1.6.0",
+    "path": "^0.12.7",
+    "path-to-regexp": "^8.2.0",
+    "pi-camera": "^1.7.0",
+    "pi-camera-connect": "^0.3.4",
+    "router": "^2.2.0",
+    "ws": "^8.18.3"
+  }
+}

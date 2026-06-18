@@ -1,0 +1,2010 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&family=Roboto+Mono:wght@300;400;500&display=swap');
+/* /home/pi/git-repos/DoorsAndCamera_ColdBox/public/css/index.css */
+:root {
+  --primary-blue: #001974;
+  --secondary-blue: #4791f1;
+  --gradient-blue: linear-gradient(to right, #002e74, white);
+  --panel-bg: #E5E5E5;
+  --panel-border: #000000;
+  --text-primary: #000000;
+  --text-secondary: #ffffff;
+  --button-primary: linear-gradient(#006aeb, #002e74, #006aeb);
+  --button-border: #ffffff;
+  --control-bar: linear-gradient(to left, #006aeb, #002e74);
+  --digital-red: #ff3333;
+  --digital-darkred: #7f0000;
+  --digital-ice-blue: #1d7fff;
+  --digital-dark-blue: #000587;
+  --digital-light-blue: #97d4ff;
+  --status-bg: rgba(255, 51, 51, 0.1);
+  --status-border: rgba(255, 51, 51, 0.3);
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  background: linear-gradient(to right, #002e74, white);
+  min-height: 100vh;
+  font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', sans-serif;
+  color: var(--text-primary);
+  margin: 5px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  line-height: 1.3;
+}
+.app-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 10px);
+  margin: 5px;
+}
+.app-header {
+  background: var(--gradient-blue);
+  padding: 0.25rem;
+  border-radius: 5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2px;
+  height: 55px;
+}
+.app-title {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  flex: 1;
+  font-family: 'Segoe UI', 'Roboto', sans-serif;
+}
+.header-nav {
+  flex: 0 0 auto;
+}
+.header-nav .nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.4rem 0.8rem;
+  background: var(--button-primary);
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-weight: 600;
+  border-radius: 5px;
+  border: 1px solid var(--button-border);
+  transition: all 0.3s ease;
+  font-size: 0.8rem;
+  font-family: 'Segoe UI', 'Roboto', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.header-nav .nav-link:hover {
+  background: linear-gradient(#47cbf1, #005074);
+  border: 1px solid #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+.header-nav .nav-link i {
+  font-size: 0.9rem;
+}
+/* Header Logo Styling - Fixed sizing */
+.header-logo {
+  max-height: 35px;
+  height: auto;
+  width: auto;
+  max-width: 45px;
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+}
+.header-logo:hover {
+  transform: scale(1.05);
+}
+.main-layout {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  margin: 0;
+  min-height: 0;
+}
+.layout-grid {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 5px;
+  width: 100%;
+  height: 50%;
+}
+.door-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 2fr;
+  gap: 5px;
+  align-items: stretch;
+}
+.camera-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  align-items: stretch;
+}
+.grid-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+/* Door sections - Reduced height to save space */
+.door-section {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 180px;
+}
+.large-door {
+  min-height: 180px;
+}
+.small-door {
+  min-height: 180px;
+}
+/* Camera sections - maximum space */
+.camera-section {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 300px;
+}
+/* Door Panels - light gray theme */
+.door-panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 5px;
+  padding: 0.5rem;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-family: 'Segoe UI', 'Roboto', sans-serif;
+}
+.door-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--control-bar);
+}
+.door-panel:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+.door-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+  flex-shrink: 0;
+  padding: 0.125rem 0;
+  gap: 0.5rem;
+}
+.door-header h3 {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  font-weight: 600;
+  flex-grow: 1;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+/* Manual Controls Section - Top section with timer and buttons */
+.manual-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.25rem;
+  flex-shrink: 0;
+}
+.manual-timers {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.1rem;
+}
+.timer-value {
+  color: red;
+  font-weight: bold;
+  font-size:1.25em;
+  font-family: 'Roboto Mono', 'Courier New', monospace;
+  margin: 0.25em;
+}
+.manual-timers .timer-display {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.25rem;
+  background: #f0f0f0;
+  padding: 0.25rem;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  font-size: 0.8rem;
+  width: 100%;
+}
+.manual-timers .timer-value {
+  font-family: 'Roboto Mono', 'Courier New', monospace;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--digital-red);
+  text-shadow: 0 0 2px rgba(255, 51, 51, 0.4);
+  min-width: 40px;
+  letter-spacing: -0.5px;
+}
+.manual-timers .timer-label {
+  font-size: 0.65rem;
+  color: var(--text-primary);
+  opacity: 0.6;
+  transition: opacity 0.3s;
+  font-weight: 400;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+}
+.manual-timers .timer-label:not(:empty) {
+  opacity: 1;
+}
+.manual-buttons {
+  display: flex;
+  flex-direction: row;
+  gap: 0.25rem;
+  justify-content: center;
+}
+.manual-buttons .door-btn {
+  flex: 1;
+  padding: 0.5rem 0.6rem;
+  border: none;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  font-size: 0.65rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid transparent;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.manual-buttons .door-btn.open {
+  background: linear-gradient(var(--digital-ice-blue), var(--digital-dark-blue));
+  color: white;
+  border: 1px solid var(--digital-dark-blue);
+}
+.manual-buttons .door-btn.close {
+  background: linear-gradient(var(--digital-light-blue), var(--digital-ice-blue));
+  color: white;
+  border: 1px solid var(--digital-dark-blue);
+}
+.auto-buttons .auto-btn .close-auto {
+  background: linear-gradient(var(--digital-light-blue), var(--digital-ice-blue));
+  color: white;
+  border: 1px solid var(--digital-dark-blue);
+}
+.manual-buttons .door-btn:hover:not(:disabled) {
+  transform: scale(1.02);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+.manual-buttons .door-btn i {
+  font-size: 1rem;
+}
+.manual-buttons .door-btn span {
+  font-size: 0.55rem;
+}
+.manual-buttons .door-btn:disabled {
+  background: #e9ecef;
+  color: #6c757d;
+  cursor: not-allowed;
+  opacity: 0.7;
+  transform: none;
+  border: 1px solid #ced4da;
+}
+/* Auto Controls Section */
+.auto-controls {
+  margin-top: auto;
+  padding: 0.4rem;
+  background: #f8f9fa;
+  border-radius: 4px;
+  border: 1px solid #dee2e6;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.2rem;
+  font-family: 'Segoe UI', 'Roboto', sans-serif;
+  min-height: 0;
+}
+/* Auto Row - Horizontal layout for auto controls */
+.auto-row {
+  display: flex;
+  flex-direction: row;
+  gap: 0.25rem;
+  align-items: stretch;
+  margin-bottom: 0.2rem;
+  height: 100%;
+}
+/* Time Inputs - Left side (40% width) */
+.time-inputs {
+  flex: 0 0 40%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  align-items: stretch;
+}
+.time-input {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.15rem;
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+.time-input label {
+  font-weight: 600;
+  font-size: 0.55rem;
+  color: var(--text-primary);
+  text-align: right;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding-right: 0.2rem;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  min-width: 30px;
+  display: flex;
+  align-items: center;
+}
+.time-input input[type="number"] {
+  flex: 1;
+  padding: 0.2rem 0.1rem;
+  border: 1px solid #adb5bd;
+  border-radius: 3px;
+  background-color: #ffffff;
+  color: var(--text-primary);
+  font-size: 0.65rem;
+  font-family: 'Roboto Mono', 'Courier New', monospace;
+  text-align: center;
+  box-sizing: border-box;
+  letter-spacing: -0.2px;
+  height: 100%;
+  min-height: 1.8rem;
+}
+.time-input input[type="number"]:disabled {
+  background-color: #e9ecef;
+  border-color: #ced4da;
+  color: #6c757d;
+  cursor: not-allowed;
+}
+/* Auto Buttons - Right side (60% width) */
+.auto-buttons {
+  flex: 0 0 60%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  align-items: stretch;
+}
+.auto-buttons .auto-btn {
+  flex: 1;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.65rem;
+  border-radius: 3px;
+  border: none;
+  background: var(--button-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+  justify-content: center;
+  border: 1px solid var(--button-border);
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  font-family: 'Segoe UI', 'Roboto', sans-serif;
+  font-weight: 600;
+  height: 100%;
+  min-height: 1.8rem;
+  position: relative;
+}
+.auto-buttons .auto-btn.open {
+  background: linear-gradient(var(--digital-ice-blue), var(--digital-dark-blue));
+  color: white;
+  border: 1px solid var(--digital-dark-blue);
+}
+.auto-buttons .auto-btn.close {
+    background: linear-gradient(var(--digital-light-blue), var(--digital-ice-blue));
+  color: white;
+  border: 1px solid var(--digital-dark-blue);
+}
+/* NEW: Highlight active auto direction */
+.auto-btn.open-auto::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 1px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+.auto-btn.close-auto::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 1px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+.auto-btn i {
+  font-size: 0.8rem;
+}
+.auto-btn span {
+  font-size: 0.5rem;
+}
+.auto-btn:hover:not(:disabled) {
+  background: linear-gradient(#47cbf1, #005074);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+.auto-btn:disabled {
+  background: #e9ecef;
+  color: #6c757d;
+  cursor: not-allowed;
+  border: 1px solid #ced4da;
+}
+/* Auto Timers - Full width above the rows */
+.auto-timers {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.2rem;
+}
+.auto-timers .timer-display {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.25rem;
+  background: #f0f0f0;
+  padding: 0.25rem;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  font-size: 0.8rem;
+  width: 100%;
+  max-width: 120px;
+  transition: all 0.3s ease;
+}
+.auto-timers .timer-display.auto-active {
+  background: #e8f4fd;
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 8px rgba(0, 26, 116, 0.3);
+}
+.auto-timers .timer-value {
+  font-family: 'Roboto Mono', 'Courier New', monospace;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--digital-red);
+  text-shadow: 0 0 2px rgba(255, 51, 51, 0.4);
+  min-width: 40px;
+  letter-spacing: -0.5px;
+}
+.auto-timers .timer-label {
+  font-size: 0.65rem;
+  color: var(--text-primary);
+  opacity: 0.6;
+  transition: opacity 0.3s;
+  font-weight: 400;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.auto-timers .timer-label:not(:empty) {
+  opacity: 1;
+}
+/* Auto Note for Both Doors */
+.auto-note {
+  font-size: 0.6rem;
+  color: var(--text-primary);
+  opacity: 0.6;
+  text-align: center;
+  padding: 0.1rem 0;
+  font-style: italic;
+  border-bottom: 1px solid #dee2e6;
+  margin-bottom: 0.1rem;
+  line-height: 1.1;
+  font-family: 'Segoe UI', 'Roboto', sans-serif;
+  letter-spacing: 0.1px;
+}
+/* Timer placeholders for Both section alignment */
+.timer-placeholder {
+  width: 40px;
+  height: 1rem;
+  display: inline-block;
+  visibility: hidden;
+}
+.timer-label-placeholder {
+  width: 30px;
+  height: 0.65rem;
+  display: inline-block;
+  visibility: hidden;
+}
+/* Both Doors Auto Controls - Full width buttons */
+.both-auto-row {
+height: 100%;
+width: 100%;
+}
+.both-auto-row .auto-buttons {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: row;
+  gap: 0.25rem;
+  align-items: stretch;
+  width: 100%;
+}
+.both-auto-row .auto-btn {
+  flex: 1;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.7rem;
+  border-radius: 3px;
+  border: none;
+  background: var(--button-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+  justify-content: center;
+  border: 1px solid var(--button-border);
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  font-family: 'Segoe UI', 'Roboto', sans-serif;
+  font-weight: 600;
+  height: 100%;
+  min-height: 2rem;
+}
+.both-auto-row .auto-btn.open {
+  background: linear-gradient(var(--digital-ice-blue), var(--digital-dark-blue));
+  color: white;
+  border: 1px solid var(--digital-dark-blue);
+}
+.both-auto-row .auto-btn.close {
+  background: linear-gradient(var(--digital-light-blue), var(--digital-ice-blue));
+  color: white;
+  border: 1px solid var(--digital-dark-blue);
+}
+.both-auto-row .auto-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+.both-auto-row .auto-btn i {
+  font-size: 0.85rem;
+}
+.both-auto-row .auto-btn span {
+  font-size: 0.55rem;
+  white-space: nowrap;
+}
+.both-auto-row .auto-btn:disabled {
+  background: #e9ecef;
+  color: #6c757d;
+  cursor: not-allowed;
+  border: 1px solid #ced4da;
+}
+/* Camera Panels - light theme */
+.camera-panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 5px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  height: 100%;
+  transition: transform 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-family: 'Segoe UI', 'Roboto', sans-serif;
+}
+.camera-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--control-bar);
+}
+.camera-panel:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+.camera-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0;
+  flex-shrink: 0;
+  padding: 0.125rem 0;
+  gap: 0.5rem;
+}
+.camera-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  font-weight: 600;
+  flex-grow: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.camera-status {
+  font-size: 0.7rem;
+  color: var(--digital-red);
+  font-weight: 700;
+  padding: 0.125rem 0.5rem;
+  background: var(--status-bg);
+  border-radius: 4px;
+  border: 1px solid var(--status-border);
+  white-space: nowrap;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.video-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 4px;
+  border: 1px solid #adb5bd;
+  background-color: #000000;
+  overflow: hidden;
+  flex: 1;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+  min-height: 200px;
+  /* NEW: Relative positioning for overlaying capture button */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  padding-bottom: 0.5rem; /* Space for overlay button */
+}
+.video-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 3px;
+  cursor: zoom-in; /* Move cursor from .camera-feed to .video-wrapper */
+  transition: transform 0.2s ease;
+  flex-grow: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.video-wrapper:hover {
+  transform: scale(1.02); /* Optional: subtle zoom effect on hover */
+}
+.camera-feed {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 3px;
+  /* Remove the cursor: zoom-in from here since it's now on the wrapper */
+  transition: opacity 0.2s ease;
+}
+.camera-feed:hover {
+  opacity: 0.9;
+}
+/* Ensure canvas doesn't interfere with cursor */
+.overlay-canvas {
+  z-index: 1;
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none; /* This is key - canvas won't block clicks */
+}
+/* UPDATED: Camera Controls - Capture overlaid on video, pause centered below */
+.camera-controls {
+  /* Capture is now overlaid, so this only handles pause/resume */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0.25rem 0;
+  gap: 0.5rem; /* Adjusted for settings button */
+  position: relative; /* For any future absolute positioning */
+}
+/* NEW: Overlaid Capture Button */
+.control-btn.primary {
+  position: absolute;
+  bottom: 0.5rem;
+  /* Base: overridden by camera-specific rules below */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  background: var(--button-primary);
+  color: var(--text-secondary);
+  border: 1px solid var(--button-border);
+  border-radius: 50%; /* Circular for thumb-friendliness */
+  width: 60px;
+  height: 60px;
+  padding: 0;
+  min-width: auto;
+  font-size: 1.2rem;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+  opacity: 0.9;
+  /* Hide span for icon-only look */
+  overflow: hidden;
+}
+.control-btn.primary span {
+  display: none; /* Icon-only for overlay */
+}
+.control-btn.primary:hover:not(:disabled) {
+  transform: translateX(-50%) scale(1.1); /* Keep scale, but base transform may vary */
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  opacity: 1;
+}
+.control-btn.primary i {
+  font-size: 1.4rem; /* Larger icon for quick taps */
+}
+.control-btn.primary:disabled {
+  opacity: 0.5;
+  transform: translateX(-50%) scale(1);
+}
+/* UPDATED: Tighter Offset for ~15px effective gap - Front to right, Back to left */
+.front-camera-section .control-btn.primary {
+  left: auto;
+  right: 15px; /* Hug right edge of front panel */
+  transform: none; /* No translate for edge positioning */
+}
+.back-camera-section .control-btn.primary {
+  left: 15px; /* Hug left edge of back panel */
+  right: auto;
+  transform: none; /* No translate for edge positioning */
+}
+.front-camera-section .control-btn.primary:hover:not(:disabled),
+.back-camera-section .control-btn.primary:hover:not(:disabled) {
+  transform: scale(1.1); /* Scale without translate on hover */
+}
+/* Pause/Resume: Centered below feed */
+.control-btn.secondary {
+  background: #6c757d;
+  color: white;
+  border: 1px solid #545b62;
+  border-radius: 20px; /* Pill shape for centering */
+  padding: 0.4rem 0.8rem;
+  min-width: auto;
+  font-size: 0.7rem;
+  margin-top: 0.25rem; /* Slight space from video */
+}
+.control-btn.secondary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+.control-btn i {
+  font-size: 0.9rem;
+}
+.control-btn:disabled {
+  background: #e9ecef;
+  color: #6c757d;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+  border: 1px solid #ced4da;
+  opacity: 0.7;
+}
+.control-btn.captured {
+  background: linear-gradient(#28a745, #20c997);
+  transform: scale(1.02);
+  color: white;
+  border: 1px solid #1e7e34;
+}
+.control-btn.flash {
+  animation: flash 0.3s ease-in-out;
+}
+.camera-settings {
+  white-space: nowrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  flex-grow: 0;
+  padding: 0.25rem 0;
+  margin-top: auto; /* Push to bottom */
+}
+.setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+.setting-group label {
+  font-weight: 600;
+  margin-bottom: 0.125rem;
+  font-size: 0.65rem;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+}
+.setting-group input[type="range"] {
+  width: 100%;
+  height: 4px;
+  background: #dee2e6;
+  border-radius: 2px;
+  outline: none;
+}
+.setting-group input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: var(--primary-blue);
+  border-radius: 50%;
+  cursor: pointer;
+  border: 1px solid #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.checkbox-group {
+  white-space: nowrap;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.25rem;
+  grid-column-start: 1;
+  grid-column-end: 2;
+}
+.checkbox-group input[type="checkbox"] {
+  transform: scale(1.1);
+  accent-color: var(--primary-blue);
+}
+.custom-name-label {
+  grid-column: span 2;
+}
+.custom-name-label input[type="text"] {
+  width: 100%;
+  padding: 0.25rem;
+  border: 1px solid #adb5bd;
+  border-radius: 4px;
+  background-color: #ffffff;
+  color: var(--text-primary);
+  font-size: 0.7rem;
+  font-family: 'Segoe UI', 'Roboto', sans-serif;
+}
+.controls-footer {
+  text-align: center;
+  padding: 0.75rem;
+  background: var(--control-bar);
+  border-radius: 5px;
+  border-top: 1px solid var(--primary-blue);
+  margin-top: 5px;
+}
+.enable-switch {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-family: 'Segoe UI', 'Roboto', sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.enable-switch input[type="checkbox"] {
+  transform: scale(1.1);
+  accent-color: var(--text-secondary);
+}
+/* Responsive Design - Adjustments for overlays */
+@media (max-width: 1400px) {
+  .main-layout {
+    padding: 0.25rem;
+  }
+ 
+  .door-row,
+  .camera-row {
+    gap: 2px;
+  }
+ 
+  .layout-grid {
+    gap: 5px;
+  }
+  .header-logo {
+    max-height: 32px;
+    max-width: 42px;
+  }
+  /* Responsive overlay sizing */
+  .control-btn.primary {
+    width: 55px;
+    height: 55px;
+  }
+}
+@media (max-width: 1200px) {
+  .door-row {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 2px;
+  }
+ 
+  .large-door,
+  .small-door {
+    min-height: 160px;
+  }
+  .camera-row {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+  .camera-section {
+    min-height: 250px;
+  }
+  .main-layout {
+    padding: 0.25rem;
+  }
+  .app-header {
+    height: 50px;
+    padding: 0.25rem;
+  }
+  .app-title {
+    font-size: 1rem;
+  }
+  .door-header h3 {
+    font-size: 0.7rem;
+  }
+  .manual-timers .timer-display {
+    font-size: 0.75rem;
+    padding: 0.2rem;
+  }
+  .manual-timers .timer-value {
+    font-size: 0.9rem;
+  }
+  .manual-buttons .door-btn {
+    font-size: 0.6rem;
+    padding: 0.4rem 0.5rem;
+  }
+  /* Auto controls responsive adjustments */
+  .time-input label {
+    font-size: 0.5rem;
+    min-width: 28px;
+  }
+  .time-input input[type="number"] {
+    font-size: 0.6rem;
+    padding: 0.15rem 0.1rem;
+  }
+  .auto-buttons .auto-btn {
+    font-size: 0.6rem;
+    padding: 0.3rem 0.4rem;
+  }
+.auto-buttons .auto-btn.open {
+  background: linear-gradient(var(--digital-ice-blue), var(--digital-dark-blue));
+  color: white;
+  border: 1px solid var(--digital-dark-blue);
+}
+.auto-buttons .auto-btn.close {  background: linear-gradient(var(--digital-light-blue), var(--digital-ice-blue));
+  color: white;
+  border: 1px solid var(--digital-dark-blue);}
+  .auto-btn i {
+    font-size: 0.75rem;
+  }
+  .auto-btn span {
+    font-size: 0.48rem;
+  }
+  .both-auto-row .auto-btn {
+    font-size: 0.65rem;
+    padding: 0.35rem 0.5rem;
+    min-height: 1.9rem;
+  }
+ 
+  .both-auto-row .auto-btn span {
+    font-size: 0.5rem;
+  }
+  .auto-timers .timer-display {
+    font-size: 0.75rem;
+    padding: 0.2rem;
+    max-width: 100px;
+  }
+  .auto-timers .timer-value {
+    font-size: 0.85rem;
+    min-width: 35px;
+  }
+  .header-logo {
+    max-height: 30px;
+    max-width: 40px;
+  }
+  /* Tablet: Smaller overlay */
+  .control-btn.primary {
+    width: 50px;
+    height: 50px;
+  }
+}
+@media (max-width: 768px) {
+  body {
+    font-size: 13px;
+  }
+  .door-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .camera-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .door-section,
+  .camera-section {
+    min-height: auto;
+  }
+  /* Stack auto row vertically on mobile */
+  .auto-row {
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+  .time-inputs {
+    flex: none;
+    order: 2;
+    width: 100%;
+  }
+  .auto-buttons {
+    flex: none;
+    order: 1;
+    width: 100%;
+    flex-direction: row;
+    gap: 0.15rem;
+  }
+  .auto-buttons .auto-btn {
+    flex: 1;
+    min-height: 2rem;
+  }
+  .both-auto-row {
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+ 
+  .both-auto-row .auto-buttons {
+    flex-direction: column;
+    gap: 0.15rem;
+    width: 100%;
+  }
+ 
+  .both-auto-row .auto-btn {
+    min-height: 2.2rem;
+    font-size: 0.75rem;
+  }
+ 
+  .both-auto-row .auto-btn span {
+    font-size: 0.6rem;
+  }
+  .time-input {
+    justify-content: center;
+    gap: 0.25rem;
+  }
+  .time-input label {
+    text-align: center;
+    min-width: auto;
+    padding-right: 0;
+    font-size: 0.55rem;
+  }
+  .time-input input[type="number"] {
+    width: 50px;
+    font-size: 0.65rem;
+    padding: 0.1rem;
+  }
+  .auto-note {
+    font-size: 0.55rem;
+    padding: 0.1rem 0;
+  }
+  .door-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.125rem;
+    padding: 0.25rem 0;
+  }
+  .door-header h3 {
+    font-size: 0.8rem;
+    text-align: left;
+  }
+  .manual-buttons {
+    flex-direction: row;
+    gap: 0.25rem;
+  }
+  .manual-buttons .door-btn {
+    flex: 1;
+    padding: 0.5rem 0.6rem;
+    font-size: 0.7rem;
+  }
+  .manual-buttons .door-btn i {
+    font-size: 1rem;
+  }
+  .manual-buttons .door-btn span {
+    font-size: 0.55rem;
+  }
+  .auto-btn {
+    padding: 0.3rem 0.4rem;
+    font-size: 0.65rem;
+  }
+  .auto-btn i {
+    font-size: 0.8rem;
+  }
+  .auto-btn span {
+    font-size: 0.55rem;
+  }
+  .timer-placeholder {
+    width: 35px;
+    height: 0.9rem;
+  }
+ 
+  .timer-label-placeholder {
+    width: 25px;
+    height: 0.6rem;
+  }
+  .video-container {
+    aspect-ratio: 16 / 9;
+    min-height: 180px;
+    padding-bottom: 1rem; /* More space for mobile overlay */
+  }
+  .camera-settings {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
+  }
+  .camera-controls {
+    flex-direction: row; /* Keep horizontal for mobile centering */
+    gap: 0.5rem;
+  }
+  .control-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 0.5rem 0.8rem;
+    font-size: 0.8rem;
+    min-width: auto;
+  }
+  /* Mobile: Larger overlay for thumb */
+  .control-btn.primary {
+    width: 70px;
+    height: 70px;
+    bottom: 1rem;
+  }
+  .control-btn.primary i {
+    font-size: 1.6rem;
+  }
+  .control-btn.secondary {
+    width: 100%;
+    border-radius: 25px;
+    margin-top: 0;
+  }
+  .app-header {
+    flex-direction: column;
+    gap: 0.25rem;
+    height: auto;
+    padding: 0.5rem;
+  }
+  .header-content {
+    width: 100%;
+    justify-content: center;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .app-title {
+    font-size: 1.1rem;
+    text-align: center;
+  }
+  .header-nav {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+  .nav-link {
+    min-width: 120px;
+    font-size: 0.8rem;
+    padding: 0.3rem 0.6rem;
+  }
+  .main-layout {
+    padding: 0.125rem;
+  }
+  .layout-grid {
+    gap: 2px;
+  }
+  body {
+    margin: 2px;
+  }
+  .app-wrapper {
+    margin: 2px;
+  }
+  .header-logo {
+    max-height: 28px;
+    max-width: 38px;
+    justify-self: center;
+    margin-bottom: 0.125rem;
+  }
+}
+@media (max-width: 480px) {
+  body {
+    font-size: 12px;
+  }
+  .door-header h3 {
+    font-size: 0.75rem;
+  }
+  .manual-timers .timer-display {
+    font-size: 0.7rem;
+    padding: 0.2rem;
+  }
+  .manual-timers .timer-value {
+    font-size: 0.85rem;
+  }
+  .manual-buttons .door-btn {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.65rem;
+  }
+  /* Auto controls small screen adjustments */
+  .auto-buttons .auto-btn {
+    font-size: 0.6rem;
+    padding: 0.25rem 0.35rem;
+  }
+  .time-input input[type="number"] {
+    width: 45px;
+    font-size: 0.6rem;
+    padding: 0.1rem;
+  }
+  .time-input label {
+    font-size: 0.5rem;
+  }
+  .auto-note {
+    font-size: 0.5rem;
+  }
+  .both-auto-row .auto-btn {
+    font-size: 0.7rem;
+    padding: 0.3rem 0.4rem;
+    min-height: 2rem;
+  }
+ 
+  .both-auto-row .auto-btn span {
+    font-size: 0.55rem;
+  }
+  .auto-timers .timer-display {
+    font-size: 0.7rem;
+    padding: 0.2rem;
+  }
+  .auto-timers .timer-value {
+    font-size: 0.8rem;
+  }
+  .timer-placeholder {
+    width: 30px;
+    height: 0.8rem;
+  }
+ 
+  .timer-label-placeholder {
+    width: 20px;
+    height: 0.55rem;
+  }
+  .main-layout {
+    padding: 0.125rem;
+  }
+  .door-row,
+  .camera-row {
+    gap: 1px;
+  }
+  .door-panel,
+  .camera-panel {
+    padding: 0.25rem;
+  }
+  .video-container {
+    min-height: 150px;
+    padding-bottom: 1.5rem; /* Extra space for larger mobile overlay */
+  }
+  .layout-grid {
+    min-height: 500px;
+  }
+  .camera-header h3 {
+    font-size: 0.9rem;
+  }
+  .camera-status {
+    font-size: 0.65rem;
+    padding: 0.1rem 0.3rem;
+  }
+  .control-btn {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.75rem;
+  }
+  /* Small screen: Even larger overlay */
+  .control-btn.primary {
+    width: 80px;
+    height: 80px;
+    bottom: 1.5rem;
+  }
+  .control-btn.primary i {
+    font-size: 1.8rem;
+  }
+  .control-btn.secondary {
+    padding: 0.6rem 1rem;
+    font-size: 0.8rem;
+  }
+  .app-header {
+    padding: 0.25rem;
+  }
+  .app-title {
+    font-size: 0.95rem;
+  }
+  body {
+    margin: 1px;
+  }
+  .app-wrapper {
+    margin: 1px;
+  }
+  .header-logo {
+    max-height: 25px;
+    max-width: 35px;
+  }
+}
+/* Animations */
+@keyframes flash {
+  0% { background: var(--button-primary); }
+  50% { background: #ffffff; }
+  100% { background: var(--button-primary); }
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes autoTimerActivate {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(0, 26, 116, 0);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 0 12px rgba(0, 26, 116, 0.5);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 8px rgba(0, 26, 116, 0.3);
+  }
+}
+.status-message {
+  position: fixed;
+  bottom: 0.5rem;
+  left: 0.5rem;
+  right: 0.5rem;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+  text-align: center;
+  z-index: 1000;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  font-family: 'Segoe UI', 'Roboto', sans-serif;
+}
+.status-message.fade-in {
+  opacity: 1;
+  animation: fadeIn 0.3s ease-in-out;
+}
+.status-message.fade-out {
+  opacity: 0;
+  animation: fadeOut 0.3s ease-in-out;
+}
+.auto-timer-display.auto-active {
+  animation: autoTimerActivate 0.5s ease-in-out;
+}
+/* Utility Classes */
+.hidden {
+  display: none;
+}
+.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.control-btn.disabled {
+  background: #e9ecef !important;
+  color: #6c757d !important;
+  cursor: not-allowed !important;
+  opacity: 0.7;
+}
+/* Manual buttons placeholder for alignment */
+.door-btn-placeholder {
+  flex: 1;
+  visibility: hidden;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+/* Responsive adjustments for placeholders */
+@media (max-width: 768px) {
+  .door-btn-placeholder {
+    flex: 0.5;
+  }
+}
+@media (max-width: 480px) {
+  .door-btn-placeholder {
+    flex: 0.4;
+  }
+}
+.manual-timers .timer-label.open-running {
+  color: var(--digital-ice-blue);
+  font-weight: 600;
+  text-shadow: 0 0 2px rgba(29, 127, 255, 0.4);
+}
+.manual-timers .timer-label.close-running {
+  color: var(--digital-dark-blue);
+  font-weight: 600;
+  text-shadow: 0 0 2px rgba(151, 212, 255, 0.4);
+}
+/* Persistent direction state (not running) */
+.manual-timers .timer-display.has-direction {
+  background: rgba(29, 127, 255, 0.08);
+  border-color: rgba(29, 127, 255, 0.3);
+  box-shadow: 0 0 4px rgba(29, 127, 255, 0.15);
+  transition: all 0.3s ease;
+}
+/* Active running state */
+.manual-timers .timer-display.running {
+  background: rgba(29, 127, 255, 0.15);
+  border-color: var(--digital-ice-blue);
+  box-shadow: 0 0 6px rgba(29, 127, 255, 0.25);
+}
+/* No direction state */
+.manual-timers .timer-display:not(.has-direction) {
+  background: #f0f0f0;
+  border-color: #ccc;
+  box-shadow: none;
+}
+/* Camera Modal Styles */
+.camera-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  backdrop-filter: blur(2px);
+}
+.camera-modal-content {
+  background: #1a1a1a;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 1400px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.camera-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, #001974, #002e74);
+  color: white;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.modal-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.modal-close-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  font-size: 1.2rem;
+}
+.modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
+}
+.camera-modal-video-container {
+  position: relative;
+  width: 100%;
+  height: 70vh;
+  max-height: 600px;
+  background: #000;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.modal-camera-feed {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+}
+.modal-overlay-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+.modal-controls {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 1rem;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 25px;
+  backdrop-filter: blur(10px);
+}
+.modal-capture-btn, .modal-toggle-btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 25px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.modal-capture-btn {
+  background: linear-gradient(135deg, #006aeb, #002e74);
+  color: white;
+}
+.modal-toggle-btn {
+  background: #6c757d;
+  color: white;
+}
+.modal-capture-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 106, 235, 0.4);
+}
+.modal-toggle-btn:hover {
+  background: #5a6268;
+  transform: translateY(-2px);
+}
+.modal-footer {
+  padding: 1rem 1.5rem;
+  background: rgba(0, 0, 0, 0.2);
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.modal-timestamp-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.modal-timestamp-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #006aeb;
+}
+.modal-filename-input {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: white;
+  font-size: 0.9rem;
+}
+.modal-filename-input input[type="text"] {
+  padding: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 0.9rem;
+  min-width: 200px;
+}
+.modal-filename-input input[type="text"]:focus {
+  outline: none;
+  border-color: #006aeb;
+  background: rgba(255, 255, 255, 0.15);
+}
+.modal-filename-input input[type="text"]::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+/* Make camera feeds clickable */
+.camera-feed {
+  cursor: zoom-in;
+  transition: opacity 0.2s ease;
+}
+.camera-feed:hover {
+  opacity: 0.9;
+}
+/* Responsive modal */
+@media (max-width: 768px) {
+  .camera-modal-content {
+    max-width: 95vw;
+    max-height: 95vh;
+  }
+ 
+  .camera-modal-video-container {
+    height: 60vh;
+  }
+ 
+  .modal-controls {
+    flex-direction: column;
+    gap: 0.5rem;
+    bottom: 0.5rem;
+  }
+ 
+  .modal-capture-btn, .modal-toggle-btn {
+    width: 120px;
+    justify-content: center;
+  }
+ 
+  .modal-footer {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+  }
+ 
+  .modal-filename-input {
+    width: 100%;
+  }
+ 
+  .modal-filename-input input[type="text"] {
+    min-width: auto;
+    width: 100%;
+  }
+}
+.control-btn.record {
+  position: absolute;
+  bottom: 0.5rem;
+  z-index: 2;
+  background: linear-gradient(135deg, #dc3545, #a71e2a); /* Red gradient */
+  color: var(--text-secondary);
+  border: 1px solid #c82333;
+  border-radius: 50%; /* Circular like capture */
+  width: 60px;
+  height: 60px;
+  padding: 0;
+  font-size: 1.2rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+  transition: all 0.3s ease;
+  opacity: 0.9;
+  overflow: hidden;
+}
+.control-btn.record span {
+  display: none; /* Icon-only */
+}
+.control-btn.record:hover:not(:disabled) {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(220, 53, 69, 0.4);
+  opacity: 1;
+}
+.control-btn.record i {
+  font-size: 1.4rem;
+}
+.control-btn.record:disabled {
+  opacity: 0.5;
+  background: #e9ecef;
+  border-color: #ced4da;
+  color: #6c757d;
+}
+/* Recording State: Pulse red border */
+.control-btn.record.recording {
+  background: linear-gradient(135deg, #ff4757, #dc3545);
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.6);
+  animation: pulse-record 1.5s infinite;
+}
+@keyframes pulse-record {
+  0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+}
+/* Symmetric Positioning: Front record on left, back on right */
+.front-camera-section .control-btn.record {
+  left: 15px; /* Opposite capture (right) */
+  right: auto;
+  transform: none;
+}
+.back-camera-section .control-btn.record {
+  right: 15px; /* Opposite capture (left) */
+  left: auto;
+  transform: none;
+}
+.front-camera-section .control-btn.record:hover:not(:disabled),
+.back-camera-section .control-btn.record:hover:not(:disabled) {
+  transform: scale(1.1);
+}
+/* Responsive: Scale like capture */
+@media (max-width: 1200px) {
+  .control-btn.record { width: 50px; height: 50px; }
+}
+@media (max-width: 768px) {
+  .control-btn.record { width: 70px; height: 70px; bottom: 1rem; }
+}
+@media (max-width: 480px) {
+  .control-btn.record { width: 80px; height: 80px; bottom: 1.5rem; }
+  .front-camera-section .control-btn.record,
+  .back-camera-section .control-btn.record { left: 10px; right: 10px; } /* Center if cramped */
+}
+/* Modal Record Button */
+.modal-record-btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 25px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: linear-gradient(135deg, #dc3545, #a71e2a);
+  color: white;
+}
+.modal-record-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(220, 53, 69, 0.4);
+}
+.modal-record-btn.recording {
+  background: linear-gradient(135deg, #ff4757, #dc3545);
+  animation: pulse-record 1.5s infinite;
+}
+.modal-record-btn i { font-size: 1rem; }
+.modal-record-btn span { font-size: 0.85rem; }
+/* Update Modal Controls Layout (add record) */
+.modal-controls {
+  display: flex;
+  gap: 0.75rem; /* Space for 3 buttons */
+}
+@media (max-width: 768px) {
+  .modal-controls { flex-direction: column; gap: 0.5rem; }
+  .modal-record-btn { width: 140px; justify-content: center; }
+}
+/* Recording Overlay Indicator (optional: semi-transparent bar) */
+.video-container.recording::after {
+  content: 'REC';
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(220, 53, 69, 0.8);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: bold;
+  z-index: 3;
+  animation: blink 1s infinite;
+}
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* New camera settings menu styles */
+.camera-settings-menu {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 0.5rem;
+  margin-top: 0.25rem;
+  display: none;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.camera-settings-menu label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.7rem;
+}
+.camera-settings-menu select {
+  padding: 0.25rem;
+  border: 1px solid #adb5bd;
+  border-radius: 4px;
+}
+.camera-settings-menu button {
+  padding: 0.25rem;
+  background: var(--button-primary);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.camera-settings-menu button:hover {
+  opacity: 0.9;
+}
+
+.video-container.recording::after {
+  content: 'REC';
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(220, 53, 69, 0.8);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: bold;
+  z-index: 3;
+  animation: blink 1s infinite;
+}
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* === ENABLE ALL NUMBER INPUTS IN SETTINGS MENU === */
+.camera-settings-menu input[type="number"],
+.camera-settings-menu select,
+.camera-settings-menu button {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  margin-top: 0.25rem;
+  border: 1px solid #999;
+  border-radius: 4px;
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  font-size: 0.9rem;
+  cursor: text;
+  appearance: auto;
+  -moz-appearance: textfield;
+}
+
+.camera-settings-menu input[type="number"]:focus,
+.camera-settings-menu select:focus {
+  outline: 2px solid #006aeb;
+  border-color: #006aeb;
+}
+
+.camera-settings-menu button {
+  margin-top: 0.75rem;
+  background: #006aeb;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.camera-settings-menu button:hover {
+  background: #0052a9;
+}
+
+/* Remove spinner arrows from number inputs (clean look) */
+.camera-settings-menu input[type="number"]::-webkit-inner-spin-button,
+.camera-settings-menu input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* ——— 2-COLUMN CAMERA SETTINGS MENU ——— */
+.camera-settings-menu {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.settings-column label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.75rem;
+}
+
+.settings-column input[type="number"],
+.settings-column select {
+  margin-top: 0.35rem;
+  padding: 0.5rem;
+  border: 1px solid #aaa;
+  border-radius: 6px;
+  background: white;
+  font-size: 0.95rem;
+  transition: all 0.2s;
+}
+
+.settings-column input[type="number"]:focus,
+.settings-column select:focus {
+  outline: none;
+  border-color: #006aeb;
+  box-shadow: 0 0 0 3px rgba(0,106,235,0.2);
+}
+
+/* ——— GORGEOUS APPLY BUTTON ——— */
+.apply-settings-btn {
+  width: 100%;
+  padding: 0.9rem;
+  background: linear-gradient(135deg, #006aeb, #002e74);
+  color: white;
+  font-size: 1.1rem;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0,106,235,0.4);
+  text-transform: uppercase;
+}
+
+.apply-settings-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0,106,235,0.5);
+  background: linear-gradient(135deg, #0052a9, #001974);
+}
+
+.apply-settings-btn:active {
+  transform: translateY(0);
+}
+
+/* Mobile fallback — stack columns */
+@media (max-width: 900px) {
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+}

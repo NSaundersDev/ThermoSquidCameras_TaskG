@@ -1,0 +1,262 @@
+/* /home/pi/git-repos/DoorsAndCamera_ColdBox/public/css/image_manager.css */
+:root {
+  --primary-blue: #1e3a8a;
+  --secondary-blue: #214eb7;
+  --dark-gray: #1f2937;
+  --light-gray: #ffffff;
+  --white: rgb(65, 101, 155);
+  --button-hover: #84bbff;
+  --door-control: rgb(255, 255, 255);
+  --digital-red: #ff3333;
+  --digital-bg: #000000;
+  --other-blue: rgb(0, 100, 176);
+}
+
+body {
+  font-family: 'Arial', sans-serif;
+  background: linear-gradient(var(--primary-blue), var(--dark-gray), var(--primary-blue));
+  color: #fff;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+header {
+  background: linear-gradient(var(--white), var(--primary-blue));
+  padding: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+h1 {
+  margin: 0;
+  font-size: 2rem;
+  text-align: center;
+}
+
+nav {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+select, input[type="date"], button {
+  padding: 0.5rem;
+  font-size: 1rem;
+  border: none;
+  border-radius: 4px;
+  background-color: #3c3c3c;
+  color: #fff;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #4c4c4c;
+}
+
+main {
+  flex: 1;
+  padding: 2rem;
+}
+
+#image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.image-card {
+  background-color: #2c2c2c;
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s;
+}
+
+.image-card img {
+  max-width: 100%;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.image-card p {
+  margin: 0.3rem 0; /* Reduced for tighter layout */
+  font-size: 0.9rem;
+}
+
+.image-card p.file-name {
+  font-size: 0.8rem; /* Slightly smaller for hierarchy */
+  color: #ccc; /* Lighter gray to distinguish from timestamp */
+  word-break: break-all; /* Handle long names */
+}
+
+#modal-file-name {
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+  color: #ccc;
+  text-align: center;
+  word-break: break-all;
+}
+
+.modal {
+  margin-top: 5%;
+  margin-left:30%;
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: auto;
+  height: auto;
+  background-color: rgba(0, 0, 0, 0.8);
+  padding-left: 2em;
+  padding-right: 1em;
+  padding-top: 1em;
+  padding-bottom: 3em;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  border-radius: 3%;
+}
+
+.modal-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: #2c2c2c; /* Match header background */
+  border-radius: 8px;
+  padding: 1rem;
+  max-width: 90%; /* Prevent overflow on small screens */
+  position: relative; /* For positioning close button */
+  justify-content: center;
+}
+
+.modal img {
+  max-width: 600px; /* Reduced from 80% for compactness */
+  max-height: 400px; /* Adjusted for tighter layout */
+  width: auto;
+  height: auto;
+  border-radius: 8px;
+}
+
+.modal-actions {
+  margin-top: 0.5rem; /* Reduced from 1rem */
+  display: flex;
+  gap: 0.5rem; /* Reduced from 1rem */
+}
+
+.modal-actions button {
+  background-color: #007bff;
+  padding: 0.4rem 0.8rem; /* Slightly smaller */
+  border-radius: 4px;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s ease-in-out;
+}
+
+.modal-actions button#modal-download:hover {
+  background-color: #0056b3; /* Darker blue on hover */
+}
+
+.modal-actions button#modal-delete {
+  background-color: #dc3545;
+}
+
+.modal-actions button#modal-delete:hover {
+  background-color: #b02a37; /* Darker red on hover */
+}
+
+.modal-close {
+  position: absolute;
+  top: -0.5rem; /* Closer to image */
+  right: -0.5rem; /* Closer to image */
+  font-size: 1.5rem; /* Slightly smaller but still clear */
+  color: #fff;
+  background-color: #dc3545; /* Red background for contrast */
+  border-radius: 50%; /* Circular button */
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s ease-in-out;
+}
+
+.modal-close:hover {
+  transform: scale(1.1); /* Slight zoom on hover */
+}
+.modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  font-size: 2rem;
+  color: #fff;
+  cursor: pointer;
+}
+
+.modal-actions {
+  margin-top: 1rem;
+  display: flex;
+  gap: 1rem;
+}
+
+.modal-actions button {
+  background-color: #007bff;
+  padding: 0.5rem 1rem;
+}
+
+.modal-actions button#modal-delete {
+  background-color: #dc3545;
+}
+
+@media (max-width: 600px) {
+  .modal-content {
+    max-width: 95%;
+    padding: 0.5rem;
+  }
+  .modal img {
+    max-width: 100%;
+    max-height: 300px;
+  }
+  .modal-actions {
+    flex-direction: column; /* Stack buttons vertically */
+    gap: 0.3rem;
+  }
+  .modal-actions button {
+    padding: 0.3rem 0.6rem;
+  }
+}
+
+
+#status-message {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  background-color: #3c3c3c;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.pagination button {
+  background-color: #3c3c3c;
+  padding: 0.5rem 1rem;
+}
+.pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+h1 {
+  text-decoration: underline;
+}
