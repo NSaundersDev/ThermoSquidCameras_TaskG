@@ -1,0 +1,17 @@
+[Unit]
+Description=ThermoSquid Time Sync Service
+After=network.target
+
+[Service]
+ExecStart=/bin/bash -l -c '/usr/bin/node /home/pi/git-repos/ThermoSquidCameras_TaskG/servers/time_server/server.js'
+WorkingDirectory=/home/pi/git-repos/ThermoSquidCameras_TaskG/servers/time_server
+StandardOutput=journal
+StandardError=journal
+Restart=always
+RestartSec=5
+User=pi
+Environment=NODE_ENV=production
+
+
+[Install]
+WantedBy=multi-user.target

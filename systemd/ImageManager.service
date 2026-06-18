@@ -3,8 +3,8 @@ Description=ThermoSquid Camera Image Manager Service
 After=network.target
 
 [Service]
-ExecStart=/bin/bash -l -c '/usr/bin/node /home/pi/git-repos/DoorsAndCamera_ColdBox/servers/image_manager/server.js'
-WorkingDirectory=/home/pi/git-repos/DoorsAndCamera_ColdBox/servers/image_manager
+ExecStart=/bin/bash -l -c '/usr/bin/node /home/pi/git-repos/ThermoSquidCameras_TaskG/servers/image_manager/server.js'
+WorkingDirectory=/home/pi/git-repos/ThermoSquidCameras_TaskG/servers/image_manager
 StandardOutput=journal
 StandardError=journal
 Restart=always

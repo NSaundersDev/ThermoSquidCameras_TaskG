@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
   <link rel="stylesheet" href="./css/all.css">
   <link rel="stylesheet" href="./css/index.css">
-  <title>Door and Camera Control</title>
+  <title>Camera Control</title>
 </head>
 <body>
   <div class="app-wrapper">
@@ -14,12 +14,16 @@
       <div class="header-content">
         <span style="display:grid;grid-template-columns: auto 1fr auto;gap:0.25em;justify-content: center;align-items: center;">
           <img src="img/thermoSquidLogo.png" alt="ThermoSquid Logo" class="header-logo">
-          <h3 class="app-title">Door and Camera Control</h3>
+          <h3 class="app-title">Camera Control</h3>
           <nav class="header-nav">
-            <a href="/image_manager.html" class="nav-link" title="Image Gallery" style="margin-left:1em;" aria-label="View Image Gallery">
+            <a href="/image_manager.html" class="nav-link" title="Image Gallery" style="margin-left:1em;margin-right:1em;" aria-label="View Image Gallery">
               <i class="fa-solid fa-images"></i>
               <span>Gallery</span>
             </a>
+            <button id="sync-time-btn" class="control-btn secondary" style="margin-top: 10px;">
+              <i class="fa-solid fa-sync"></i>
+              <span>Sync Server Time</span>
+            </button>
           </nav>
         </span>
       </div>
@@ -153,8 +157,25 @@
     </div>
   </div>
 
-  <button class="apply-settings-btn" id="apply-front-settings">
-    Apply Settings
+  <button class="apply-settings-btn" id="apply-front-settings" style="width: 100%;
+  background: linear-gradient(135deg, #0d6efd, #0a58ca);
+  color: #fff;
+  border: none;
+  padding: 11px 18px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 3px 10px rgba(13, 110, 253, 0.35);
+  margin-top: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;">
+    <i class="fa-solid fa-check" style="color:#fff;"></i>
+    <span style="color:#fff;">Apply Settings</span>
   </button>
 </div>
               <div class="camera-settings">
@@ -292,8 +313,25 @@
     </div>
   </div>
 
-  <button class="apply-settings-btn" id="apply-back-settings">
-    Apply Settings
+  <button class="apply-settings-btn" id="apply-back-settings" style="width: 100%;
+  background: linear-gradient(135deg, #0d6efd, #0a58ca);
+  color: #fff;
+  border: none;
+  padding: 11px 18px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 3px 10px rgba(13, 110, 253, 0.35);
+  margin-top: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;" >
+    <i class="fa-solid fa-check" style="color:#fff;"></i>
+    <span style="color:#fff;">Apply Settings</span>
   </button>
 </div>
               <div class="camera-settings">
@@ -354,13 +392,23 @@
         </div>
       </div>
     </div>
-    <!-- Controls Toggle -->
-    <footer class="controls-footer">
-      <label class="enable-switch">
-        <input type="checkbox" id="control-enable" aria-label="Enable auto door controls">
-        <span>Enable Auto Controls</span>
-      </label>
-    </footer>  
+    <!-- Time Sync Success Confirmation -->
+<div id="time-sync-success" class="time-sync-overlay" style="display: none;">
+  <div class="time-sync-content">
+    <div class="time-sync-header">
+      <i class="fa-solid fa-check-circle" style="color: #28a745; font-size: 2rem;"></i>
+      <h4>Time Sync Successful</h4>
+    </div>
+    <div class="time-sync-body">
+      <p>The server time has been updated successfully.</p>
+      <div id="time-sync-new-time" style="font-family: 'Roboto Mono', monospace; font-size: 1.1rem; margin: 12px 0; color: #333;"></div>
+    </div>
+    <div class="time-sync-footer">
+      <button id="time-sync-close-btn" class="time-sync-close-btn">Close</button>
+    </div>
+  </div>
+</div>
+ 
   </div>
   <script type="module" src="js/index.js"></script>
 </body>

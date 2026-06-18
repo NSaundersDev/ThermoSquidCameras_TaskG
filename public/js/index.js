@@ -1,6 +1,5 @@
 import { Config } from './config.js';
 // WebSockets
-let doorWs = new WebSocket(Config.getSocketUrl(Config.IPs.DEV2, 8080));
 let frontCameraWs = new WebSocket(Config.getSocketUrl(Config.IPs.DEV2, 8081));
 let backCameraWs = new WebSocket(Config.getSocketUrl(Config.IPs.DEV2, 8082));
 let imageWs = new WebSocket(Config.getSocketUrl(Config.IPs.DEV2, 3000) + '/ws');
@@ -49,11 +48,6 @@ const captureBackImageButton = document.getElementById('capture-back-image');
 const recordFrontButton = document.getElementById('record-front-video');
 const recordBackButton = document.getElementById('record-back-video');
 const statusMessage = document.getElementById('status-message');
-const controlEnableCheckbox = document.getElementById('control-enable');
-if (controlEnableCheckbox) {
-  controlEnableCheckbox.addEventListener('change', debounce(updateControlState, 100));
-  updateControlState(); // initial state
-}// New settings elements
 const settingsFrontButton = document.getElementById('settings-front');
 const settingsBackButton = document.getElementById('settings-back');
 const frontSettingsMenu = document.getElementById('front-settings-menu');
@@ -150,296 +144,7 @@ function showStatusMessage(message, duration = 1500) {
  
   statusMessage.dataset.timeoutId = timeoutId;
 }
-function updateControlState() {
-  if (!controlEnableCheckbox) return;
- 
-  const isEnabled = controlEnableCheckbox.checked;
-// Only disable auto-door time inputs — NOT camera settings!
-  const autoTimeInputs = document.querySelectorAll('.time-inputs input[type="number"]');
-  const autoButtons = document.querySelectorAll('.auto-btn');
 
-  autoTimeInputs.forEach(i => i.disabled = !isEnabled);
-  autoButtons.forEach(b => b.disabled = !isEnabled);
-  autoButtons.forEach(b => b.classList.toggle('disabled', !isEnabled));
-  autoTimeInputs.forEach(i => i.classList.toggle('disabled', !isEnabled));
-
-  // CAMERA SETTINGS ARE NEVER DISABLED
-  document.querySelectorAll('.camera-settings-menu input, .camera-settings-menu select').forEach(el => {
-    el.disabled = false;
-    el.classList.remove('disabled');
-  });
-}
-function startStopwatch(door, direction) {
-  if (!stopwatchState[door]) return;
- 
-  const newDirection = direction.toLowerCase();
- 
-  // Only reset elapsed time and update direction if it's actually different
-  if (stopwatchState[door].direction !== newDirection) {
-    stopwatchState[door].elapsed = 0;
-    stopwatchState[door].direction = newDirection;
-  }
- 
-  if (!stopwatchState[door].isRunning) {
-    stopwatchState[door].isRunning = true;
-    const startTime = Date.now() - stopwatchState[door].elapsed;
-    stopwatchState[door].interval = setInterval(() => {
-      if (stopwatchState[door].isRunning) {
-        stopwatchState[door].elapsed = Date.now() - startTime;
-        updateStopwatch(door);
-      }
-    }, 100);
-  }
-  updateStopwatch(door);
-}
-function stopStopwatch(door) {
-  if (!stopwatchState[door]) return;
- 
-  if (stopwatchState[door].isRunning) {
-    stopwatchState[door].isRunning = false;
-    // Keep direction for UI persistence
-    clearInterval(stopwatchState[door].interval);
-    stopwatchState[door].interval = null;
-  }
-  updateStopwatch(door);
-}
-function clearStopwatchDirection(door) {
-  if (!stopwatchState[door]) return;
- 
-  stopwatchState[door].direction = null;
-  if (stopwatchState[door].isRunning) {
-    stopStopwatch(door);
-  } else {
-    updateStopwatch(door);
-  }
-}
-function updateStopwatch(door) {
-  const stopwatchElement = document.getElementById(`${door}-stopwatch`);
-  const directionElement = document.getElementById(`${door}-direction`);
-  const timerDisplay = directionElement?.closest('.timer-display');
- 
-  if (stopwatchElement && directionElement) {
-    requestAnimationFrame(() => {
-      stopwatchElement.textContent = formatTime(stopwatchState[door].elapsed / 1000);
-     
-      if (stopwatchState[door].direction) {
-        // Show direction whether running or not (persistent display)
-        const directionText = stopwatchState[door].direction.toUpperCase();
-        directionElement.textContent = directionText;
-       
-        // Add appropriate class for styling
-        const className = stopwatchState[door].direction === 'open' ?
-          'open-running' : 'close-running';
-        directionElement.className = `timer-label ${className}`;
-       
-        // Add persistent running class to the display
-        if (timerDisplay) {
-          timerDisplay.classList.add('has-direction');
-          // Add running class only if actually running
-          if (stopwatchState[door].isRunning) {
-            timerDisplay.classList.add('running');
-          } else {
-            timerDisplay.classList.remove('running');
-          }
-        }
-      } else {
-        // No direction set
-        directionElement.textContent = '';
-        directionElement.className = 'timer-label';
-        if (timerDisplay) {
-          timerDisplay.classList.remove('has-direction', 'running');
-        }
-      }
-    });
-  }
-}
-function startAutoTimer(door, direction, seconds) {
-  if (!autoTimerState[door]) return;
- 
-  autoTimerState[door].direction = direction.toLowerCase();
-  autoTimerState[door].remaining = seconds;
- 
-  if (!autoTimerState[door].isRunning) {
-    autoTimerState[door].isRunning = true;
-    updateAutoTimerVisualState(door, true);
-    updateAutoButtonClasses(door, direction.toLowerCase());
-   
-    const startTime = Date.now();
-    autoTimerState[door].interval = setInterval(() => {
-      if (autoTimerState[door].isRunning) {
-        const elapsed = (Date.now() - startTime) / 1000;
-        autoTimerState[door].remaining = Math.max(0, seconds - elapsed);
-        updateAutoTimer(door);
-        if (autoTimerState[door].remaining <= 0) {
-          stopMove(door, 'auto-complete', 0, 0);
-        }
-      }
-    }, 100);
-  }
-  updateAutoTimer(door);
-}
-function stopAutoTimer(door) {
-  if (!autoTimerState[door]) return;
- 
-  if (autoTimerState[door].isRunning) {
-    autoTimerState[door].isRunning = false;
-    autoTimerState[door].direction = null;
-    clearInterval(autoTimerState[door].interval);
-    autoTimerState[door].interval = null;
-    autoTimerState[door].remaining = 0;
-    updateAutoTimerVisualState(door, false);
-    resetAutoButtonClasses(door);
-  }
-  updateAutoTimer(door);
-}
-function updateAutoTimer(door) {
-  const timerElement = document.getElementById(`${door}-auto-timer`);
-  const directionElement = document.getElementById(`${door}-auto-direction`);
- 
-  // Skip "both" door since it doesn't have timer elements
-  if (door === 'both' || !timerElement || !directionElement) {
-    return;
-  }
- 
-  requestAnimationFrame(() => {
-    timerElement.textContent = formatTime(autoTimerState[door].remaining);
-   
-    if (autoTimerState[door].isRunning && autoTimerState[door].direction) {
-      const directionText = autoTimerState[door].direction === 'open' ? 'OPEN' : 'CLOSE';
-      const className = autoTimerState[door].direction === 'open' ? 'open-running' : 'close-running';
-      directionElement.textContent = directionText;
-      directionElement.className = `timer-label ${className}`;
-    } else {
-      directionElement.textContent = '';
-      directionElement.className = 'timer-label';
-    }
-  });
-}
-function updateAutoTimerVisualState(door, isActive) {
-  // Skip "both" door since it doesn't have timer elements
-  if (door === 'both') return;
- 
-  const autoTimerDisplay = document.querySelector(`#${door}-auto-timer`)?.closest('.timer-display');
-  if (autoTimerDisplay) {
-    if (isActive) {
-      autoTimerDisplay.classList.add('auto-active');
-    } else {
-      autoTimerDisplay.classList.remove('auto-active');
-    }
-  }
-}
-function updateAutoButtonClasses(door, direction) {
-  const openAutoButton = document.getElementById(`${door}-open-auto`);
-  const closeAutoButton = document.getElementById(`${door}-close-auto`);
- 
-  if (openAutoButton && closeAutoButton) {
-    // Reset both buttons first
-    openAutoButton.classList.remove('open-auto');
-    closeAutoButton.classList.remove('close-auto');
-   
-    if (direction === 'open') {
-      openAutoButton.classList.add('open-auto');
-    } else if (direction === 'close') {
-      closeAutoButton.classList.add('close-auto');
-    }
-  }
-}
-function resetAutoButtonClasses(door) {
-  const openAutoButton = document.getElementById(`${door}-open-auto`);
-  const closeAutoButton = document.getElementById(`${door}-close-auto`);
- 
-  if (openAutoButton) {
-    openAutoButton.classList.remove('open-auto');
-  }
-  if (closeAutoButton) {
-    closeAutoButton.classList.remove('close-auto');
-  }
-}
-// Door movement
-function startMove(door, action, eventType, clientX, clientY, seconds = null) {
-  const targetDoors = door === 'both' ? ['front', 'back'] : [door];
-  const direction = action.includes('open') ? 'open' : 'close';
- 
-  console.log(`Starting ${door} ${direction} (${seconds}s)`);
- 
-  targetDoors.forEach((d, index) => {
-    if (activeMoves.has(d)) {
-      stopMove(d, 'preempted', 0, 0);
-    }
-   
-    let timerSeconds = seconds;
-    if (seconds && Array.isArray(seconds)) {
-      timerSeconds = seconds[index];
-    }
-   
-    activeMoves.set(d, {
-      action: action,
-      direction: direction,
-      startTime: Date.now(),
-      seconds: timerSeconds
-    });
-   
-    if (timerSeconds && timerSeconds > 0) {
-      startAutoTimer(d, direction === 'open' ? 'Open' : 'Close', timerSeconds);
-    } else {
-      startStopwatch(d, direction === 'open' ? 'Open' : 'Close');
-    }
-   
-    const message = timerSeconds !== null && timerSeconds !== undefined
-      ? { door: d, action: action, seconds: timerSeconds }
-      : { door: d, action: action };
-   
-    if (doorWs.readyState === WebSocket.OPEN) {
-      doorWs.send(JSON.stringify(message));
-    }
-  });
- 
-  if (door === 'both') {
-    const maxSeconds = Math.max(...(Array.isArray(seconds) ? seconds : [seconds || 0]));
-    activeMoves.set('both', {
-      action: action,
-      direction: direction,
-      startTime: Date.now(),
-      seconds: maxSeconds
-    });
-    if (maxSeconds > 0) {
-      startAutoTimer('both', direction === 'open' ? 'Open' : 'Close', maxSeconds);
-    } else {
-      startStopwatch('both', direction === 'open' ? 'Open' : 'Close');
-    }
-  }
-}
-function stopMove(door, eventType, clientX, clientY) {
-  const targetDoors = door === 'both' ? ['front', 'back'] : [door];
- 
-  targetDoors.forEach((d) => {
-    if (!activeMoves.has(d)) return;
-   
-    const moveData = activeMoves.get(d);
-    activeMoves.delete(d);
-   
-    if (moveData.seconds && moveData.seconds > 0) {
-      stopAutoTimer(d);
-    } else {
-      // For manual moves, don't clear direction unless it's a server-stopped event
-      if (eventType === 'server-stopped') {
-        clearStopwatchDirection(d);
-      } else {
-        stopStopwatch(d); // This keeps the direction persistent
-      }
-    }
-   
-    const message = { door: d, action: 'stop' };
-    if (doorWs.readyState === WebSocket.OPEN) {
-      doorWs.send(JSON.stringify(message));
-    }
-  });
- 
-  if (door === 'both' && activeMoves.has('both')) {
-    activeMoves.delete('both');
-    stopAutoTimer('both');
-  }
-}
 // Fixed timestamp drawing with proper image scaling
 function drawTimestamp(imageElement, canvas, ctx, door, timestamp, timestampCheckbox) {
   if (!timestampCheckbox?.checked || !canvas || !ctx || !imageElement.complete) {
@@ -465,7 +170,8 @@ function drawTimestamp(imageElement, canvas, ctx, door, timestamp, timestampChec
   ctx.fillStyle = 'white';
   ctx.strokeStyle = 'black';
   ctx.lineWidth = 2;
-  const text = `${door.charAt(0).toUpperCase() + door.slice(1)}: ${new Date(timestamp).toLocaleString()}`;
+
+  const text = `${new Date(timestamp).toLocaleString()}`;
   ctx.strokeText(text, 10, 40);
   ctx.fillText(text, 10, 40);
  
@@ -692,34 +398,33 @@ function connectCameraWebSocket(camera, ws, videoStream, canvas, ctx, timestampC
   const minFrameInterval = 132; // ~30 FPS
   ws.binaryType = 'arraybuffer';
   // Enable capture button after connection (even without frames)
-  ws.onopen = () => {
+ ws.onopen = () => {
   console.log(`${camera} camera connected`);
   framesReceived = 0;
   invalidFrameCounts[camera] = 0;
   reconnectAttempts[camera] = 0;
   isPaused[camera] = false;
 
-  // === RE-APPLY PENDING CONFIG IF ANY ===
-  if (window.pendingCameraConfig && window.pendingCameraConfig[camera]) {
-    console.log(`Re-applying pending config for ${camera}`);
-    ws.send(JSON.stringify(window.pendingCameraConfig[camera]));
-    delete window.pendingCameraConfig[camera];
+  // Enable record button immediately on successful connection
+  const recordBtn = camera === 'front' ? recordFrontButton : recordBackButton;
+  if (recordBtn) {
+    recordBtn.disabled = false;
+    recordBtn.classList.remove('disabled');
   }
 
-  // ENABLE RECORD BUTTON IMMEDIATELY — THIS IS THE FIX
-  const recordButton = camera === 'front' ? recordFrontButton : recordBackButton;
-  if (recordButton) {
-    recordButton.disabled = false;
-    recordButton.classList.remove('disabled');
-  }
-
-  // Also enable capture button (keep existing logic)
+  // Also enable capture button
   if (captureButton) {
     captureButton.disabled = false;
     captureButton.classList.remove('disabled');
   }
 
-  showStatusMessage(`${camera} camera ready`, 1000);
+  // Re-apply any pending camera config
+  if (window.pendingCameraConfig && window.pendingCameraConfig[camera]) {
+    ws.send(JSON.stringify(window.pendingCameraConfig[camera]));
+    delete window.pendingCameraConfig[camera];
+  }
+
+  showStatusMessage(`${camera} camera ready`, 800);
 };
   ws.onmessage = (event) => {
     try {
@@ -869,38 +574,7 @@ function connectCameraWebSocket(camera, ws, videoStream, canvas, ctx, timestampC
     }
   };
 }
-function connectDoorWebSocket() {
-  doorWs.onopen = () => {
-    console.log('Doors connected');
-    showStatusMessage('Doors connected', 1000);
-  };
-  // Handle door server messages
-  doorWs.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      console.debug('Door server:', data);
-     
-      if (data.status === 'stopped' && data.door) {
-        const door = data.door.toLowerCase();
-        if (activeMoves.has(door)) {
-          stopMove(door, 'server-stopped', 0, 0); // This will clear direction
-        }
-      }
-    } catch (e) {
-      console.debug('Door message ignored');
-    }
-  };
-  doorWs.onclose = () => {
-    console.log('Doors disconnected');
-    setTimeout(() => {
-      doorWs = new WebSocket(Config.getSocketUrl(Config.IPs.DEV2, 8080));
-      connectDoorWebSocket();
-    }, reconnectDelay);
-  };
-  doorWs.onerror = (error) => {
-    console.warn('Door connection error');
-  };
-}
+
 function connectImageWebSocket() {
   imageWs.onopen = () => {
     console.log('Image service connected');
@@ -919,7 +593,7 @@ function connectImageWebSocket() {
     console.log('Image service disconnected');
     // Auto-reconnect image service
     setTimeout(() => {
-      imageWs = new WebSocket(Config.getSocketUrl(Config.IPs.DEV2, 3000) + '/ws');
+      imageWs = new WebSocket(Config.getSocketUrl(window.location.hostname, 3000) + '/ws');
       connectImageWebSocket();
     }, 2000);
   };
@@ -1659,8 +1333,95 @@ function setupModalFrameListener() {
     if (originalBackOnLoad) originalBackOnLoad.call(this);
   };
 }
+
+function getLocalWindowsTime() {
+  const now = new Date();
+
+  const year   = now.getFullYear();
+  const month  = String(now.getMonth() + 1).padStart(2, '0');
+  const day    = String(now.getDate()).padStart(2, '0');
+  const hours  = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+let timeWs = null;
+function connectTimeServer() {
+  // This is the important line - it uses whatever hostname/IP the page was loaded from
+  const host = window.location.hostname;
+  
+  console.log(`[Time] Connecting to ws://${host}:3002`);
+  
+  timeWs = new WebSocket(`ws://${host}:3002`);
+
+  timeWs.onopen = () => {
+    console.log('%c[Time] ✅ Connected to time server', 'color: limegreen');
+  };
+
+  timeWs.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+
+      if (data.type === 'success') {
+        alert("✅ Time Sync Successful!\n\n" + data.message);
+      }
+
+      if (data.type === 'error') {
+        alert("❌ Time Sync Failed:\n" + data.message);
+      }
+    } catch (e) {}
+  };
+
+  timeWs.onclose = () => {
+    console.log('%c[Time] Disconnected from time server', 'color: red');
+    // Auto-reconnect
+    setTimeout(connectTimeServer, 5000);
+  };
+
+  timeWs.onerror = (err) => {
+    console.error('%c[Time] WebSocket error', 'color: orange');
+  };
+}
+
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
+connectTimeServer();
+setTimeout(() => {
+  if (frontCameraWs && frontCameraWs.readyState === WebSocket.OPEN && recordFrontButton) {
+    recordFrontButton.disabled = false;
+    recordFrontButton.classList.remove('disabled');
+  }
+  if (backCameraWs && backCameraWs.readyState === WebSocket.OPEN && recordBackButton) {
+    recordBackButton.disabled = false;
+    recordBackButton.classList.remove('disabled');
+  }
+}, 600);
+// Sync button handler
+const syncTimeBtn = document.getElementById('sync-time-btn');
+
+if (syncTimeBtn) {
+  syncTimeBtn.addEventListener('click', () => {
+    if (!timeWs || timeWs.readyState !== WebSocket.OPEN) {
+      if (typeof showStatusMessage === 'function') {
+        showStatusMessage('Time server not connected', 2500);
+      }
+      return;
+    }
+
+    const localTime = getLocalWindowsTime();
+
+    timeWs.send(JSON.stringify({
+      type: 'sync-time',
+      time: localTime,           // ← Send formatted local time
+      password: 'Lasers4Life'
+    }));
+
+    if (typeof showStatusMessage === 'function') {
+      showStatusMessage('Syncing server time...', 2000);
+    }
+  });
+}
   // Make camera feeds clickable for modal - FIXED: Attach to .video-wrapper instead of .camera-feed
   const videoWrappers = document.querySelectorAll('.video-wrapper');
   videoWrappers.forEach(wrapper => {
@@ -1671,15 +1432,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const camera = cameraSection.dataset.camera;
       openCameraModal(camera);
     });
-    // Auto-start camera server when first user loads the page
-    fetch('/api/camera/start', { method: 'POST' })
-      .then(r => r.json())
-      .then(data => {
-        if (data.status === 'started' || data.status === 'already_running') {
-          console.log('Camera server is running');
-        }
-      })
-      .catch(err => console.warn('Failed to start camera server (maybe already running)', err));
+   
   });
   // Listen for new frames in modal
   setupModalFrameListener();
@@ -1786,11 +1539,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isAuto && action) {
       button.addEventListener('click', debounce((event) => {
         event.preventDefault();
-       
-        if (!controlEnableCheckbox?.checked) {
-          showStatusMessage('Enable auto controls first', 1500);
-          return;
-        }
+      
        
         const targetDoors = door === 'both' ? ['front', 'back'] : [door];
         const isMoving = targetDoors.some(d => activeMoves.has(d));
@@ -1837,15 +1586,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 50));
     }
   });
-  // Auto controls toggle
-  if (controlEnableCheckbox) {
-    controlEnableCheckbox.addEventListener('change', debounce(updateControlState, 100));
-    // Initialize disabled state
-    updateControlState();
-  }
+
   // Connect WebSockets
   setTimeout(() => {
-    connectDoorWebSocket();
     connectImageWebSocket();
     if (frontVideoStream) {
       connectCameraWebSocket('front', frontCameraWs, frontVideoStream, frontCanvas, frontCtx, frontTimestampCheckbox, captureFrontImageButton, toggleFrontStreamButton);
@@ -2001,7 +1744,70 @@ function applyCameraSettings(camera) {
     denoise: document.getElementById(`${camera}-denoise`).value || 'auto'
   };
 
+  let timeWs = null;
+
+function connectTimeServer() {
+  const host = window.location.hostname;
+  console.log(`[Time] Trying to connect to ws://${host}:3002`);
+
+
+  timeWs = new WebSocket(`ws://${host}:3002`);
+
+  timeWs.onopen = () => {
+    console.log('%c[Time] ✅ Connected to time server', 'color: limegreen');
+    showStatusMessage('Time server connected', 2000);
+  };
+
+  timeWs.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.type === 'success') {
+        alert("✅ Time Sync Successful!\n\n" + data.message);
+      }
+      if (data.type === 'error') {
+        alert("❌ Time Sync Failed:\n" + data.message);
+      }
+    } catch (e) {}
+  };
+
+  timeWs.onclose = () => {
+    console.log('%c[Time] ❌ Disconnected from time server', 'color: red');
+    showStatusMessage('Time server disconnected', 2000);
+  };
+
+  timeWs.onerror = (err) => {
+    console.error('%c[Time] Connection error', 'color: orange', err);
+    showStatusMessage('Time server connection failed', 3000);
+  };
+
+  // Sync button
+const syncTimeBtn = document.getElementById('sync-time-btn');
+if (syncTimeBtn) {
+  syncTimeBtn.addEventListener('click', () => {
+    if (!timeWs || timeWs.readyState !== WebSocket.OPEN) {
+      alert("Time server is NOT connected.\nCheck console for errors.");
+      return;
+    }
+
+    const now = new Date();
+    const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ` +
+                    `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+
+    timeWs.send(JSON.stringify({
+      type: 'sync-time',
+      time: timeStr,
+      password: 'Lasers4Life'
+    }));
+
+    showStatusMessage('Sending time to server...', 1500);
+  });
+}
+
   showStatusMessage(`${camera.toUpperCase()} settings applied – restarting stream...`, 3000);
+}
+
+
+
 
   const cameraWs = camera === 'front' ? frontCameraWs : backCameraWs;
 
@@ -2024,10 +1830,6 @@ function applyCameraSettings(camera) {
     }
   };
   sendConfig();
-
-  // Close menu
-  toggleSettingsMenu(camera);
-
   setTimeout(() => {
   const ws = camera === 'front' ? frontCameraWs : backCameraWs;
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {

@@ -62,32 +62,44 @@ body {
 .header-nav {
   flex: 0 0 auto;
 }
+/* ======================================================
+   GALLERY BUTTON — Match Apply Settings button style
+   ====================================================== */
 .header-nav .nav-link {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.4rem 0.8rem;
-  background: var(--button-primary);
-  color: var(--text-secondary);
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #0d6efd, #0a58ca);
+  color: #fff !important;
   text-decoration: none;
-  font-weight: 600;
-  border-radius: 5px;
-  border: 1px solid var(--button-border);
-  transition: all 0.3s ease;
-  font-size: 0.8rem;
-  font-family: 'Segoe UI', 'Roboto', sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.header-nav .nav-link:hover {
-  background: linear-gradient(#47cbf1, #005074);
-  border: 1px solid #ffffff;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-.header-nav .nav-link i {
+  padding: 8px 16px;
   font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  box-shadow: 0 3px 10px rgba(13, 110, 253, 0.35);
+  transition: all 0.2s ease;
+  white-space: nowrap;
 }
+
+.header-nav .nav-link:hover {
+  background: linear-gradient(135deg, #0a58ca, #084298);
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(13, 110, 253, 0.45);
+  color: #fff !important;
+}
+
+.header-nav .nav-link:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(13, 110, 253, 0.3);
+}
+
+/* Icon inside gallery button */
+.header-nav .nav-link i {
+  font-size: 1rem;
+}
+
 /* Header Logo Styling - Fixed sizing */
 .header-logo {
   max-height: 35px;
@@ -2007,4 +2019,181 @@ width: 100%;
   .settings-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.time-sync-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 4000;
+}
+
+.time-sync-content {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 380px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.time-sync-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 24px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.time-sync-header h4 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #28a745;
+}
+
+.time-sync-body {
+  padding: 24px;
+  text-align: center;
+}
+
+.time-sync-body p {
+  margin: 0 0 8px 0;
+  color: #555;
+}
+
+.time-sync-footer {
+  padding: 16px 24px;
+  background: #f8f9fa;
+  text-align: right;
+  border-top: 1px solid #dee2e6;
+}
+
+.time-sync-close-btn {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.time-sync-close-btn:hover {
+  background: #218838;
+}
+
+/* The row containing both camera sections */
+.camera-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;   /* ← KEY FIX: never stretch children to match tallest */
+  gap: 1rem;
+  justify-content: center;
+}
+
+/* Each camera section/panel keeps its own natural height */
+.camera-section,
+.camera-panel {
+  height: auto;
+  align-self: flex-start;
+}
+
+/* Video area must never stretch — lock aspect ratio */
+.video-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;      /* 1536×864 ≈ 16:9 — change if your cameras differ */
+  background: #111;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;            /* prevent compression */
+}
+
+.video-wrapper {
+  width: 100%;
+  height: 100%;
+}
+
+.camera-feed {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;       /* or 'cover' if you prefer full bleed */
+  display: block;
+}
+
+/* Settings menu can be tall without affecting the row height */
+.camera-settings-menu {
+  margin-top: 0.5rem;
+}
+
+.camera-settings-menu label {
+  display: grid !important;
+  grid-template-columns: 1fr 135px;   /* label takes space, control fixed at 135px */
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.9rem;
+}
+
+.camera-settings-menu label select,
+.camera-settings-menu label input[type="number"] {
+  width: 100%;
+  max-width: 135px;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #1f1f1f;
+  color: #eee;
+}
+
+/* Make the two columns sit closer together */
+.settings-grid {
+  gap: 0.75rem 1rem;
+}
+
+/* ======================================================
+   APPLY SETTINGS BUTTON — Modern look
+   ====================================================== */
+.apply-settings-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #0d6efd, #0a58ca);
+  color: #fff;
+  border: none;
+  padding: 11px 18px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 3px 10px rgba(13, 110, 253, 0.35);
+  margin-top: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.apply-settings-btn:hover {
+  background: linear-gradient(135deg, #0a58ca, #084298);
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(13, 110, 253, 0.45);
+}
+
+.apply-settings-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(13, 110, 253, 0.3);
+}
+
+/* Optional icon inside button (recommended) */
+.apply-settings-btn i {
+  font-size: 1rem;
 }
