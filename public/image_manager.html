@@ -39,7 +39,7 @@
   let ws = null;
   let currentImages = [];
   let currentPage = 1;
-
+  let isRendering = false; 
   function connectWebSocket() {
     const host = window.location.hostname;
     ws = new WebSocket(`ws://${host}:3000/ws`);
@@ -55,7 +55,14 @@
         console.log('WebSocket received:', data);
 
         if (data.status === 'image_list') {
-          currentImages = data.images || [];
+          // Deduplicate by full path + timestamp (very robust)
+          const uniqueMap = new Map();
+          (data.images || []).forEach(img => {
+            const key = `${img.path}|${img.timestamp}`;
+            uniqueMap.set(key, img);
+          });
+          currentImages = Array.from(uniqueMap.values());
+          
           currentPage = 1;
           renderImages();
         } 
@@ -115,12 +122,16 @@ function showStatus(message, duration = 3000, isError = false) {
   }, duration);
 }
 
-  function renderImages() {
+function renderImages() {
+    if (isRendering) return;
+    isRendering = true;
+
     const grid = document.getElementById('image-grid');
     grid.innerHTML = '';
 
     if (!currentImages.length) {
       grid.innerHTML = '<p style="padding: 2rem; color: #666;">No images or clips found.</p>';
+      isRendering = false;
       return;
     }
 
@@ -137,16 +148,9 @@ function showStatus(message, duration = 3000, isError = false) {
                       img.path.endsWith('.mp4') || 
                       img.path.endsWith('.mov');
 
-      let mediaHTML = '';
-      if (isVideo) {
-        mediaHTML = `
-          <video src="${img.path}" controls muted preload="metadata" style="width:100%; border-radius:6px;"></video>
-        `;
-      } else {
-        mediaHTML = `
-          <img src="${img.path}" alt="${img.door} media" loading="lazy">
-        `;
-      }
+      let mediaHTML = isVideo 
+        ? `<video src="${img.path}" controls muted preload="metadata" style="width:100%; border-radius:6px;"></video>`
+        : `<img src="${img.path}" alt="${img.door} media" loading="lazy">`;
 
       card.innerHTML = `
         ${mediaHTML}
@@ -154,7 +158,6 @@ function showStatus(message, duration = 3000, isError = false) {
         <button class="view-btn">View</button>
       `;
 
-      // Attach click handler properly
       card.querySelector('.view-btn').onclick = () => {
         showModal(img.path, img.door, img.timestamp, isVideo);
       };
@@ -178,6 +181,7 @@ function showStatus(message, duration = 3000, isError = false) {
 
       grid.appendChild(pagination);
     }
+    isRendering = false;
   }
 
   function changePage(page) {
@@ -234,4 +238,5 @@ function showStatus(message, duration = 3000, isError = false) {
 
   // Start everything
   connectWebSocket();
+  window.forceRefreshImages = fetchImages;
 </script>

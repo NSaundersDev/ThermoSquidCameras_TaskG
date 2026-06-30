@@ -1,8 +1,8 @@
-import { Config } from './config.js';
+const host = window.location.hostname;
 // WebSockets
-let frontCameraWs = new WebSocket(Config.getSocketUrl(Config.IPs.DEV2, 8081));
-let backCameraWs = new WebSocket(Config.getSocketUrl(Config.IPs.DEV2, 8082));
-let imageWs = new WebSocket(Config.getSocketUrl(Config.IPs.DEV2, 3000) + '/ws');
+let frontCameraWs = new WebSocket(`ws://${host}:8081/ws`);
+let backCameraWs = new WebSocket(`ws://${host}:8082/ws`);
+let imageWs = new WebSocket(`ws://${host}:3000/ws`);
 let temperatureWs = null;
 const activeMoves = new Map();
 let reconnectAttempts = { front: 0, back: 0 }; // Camera-specific
@@ -545,10 +545,10 @@ function connectCameraWebSocket(camera, ws, videoStream, canvas, ctx, timestampC
         reconnectAttempts[camera]++;
         console.log(`Reconnecting ${camera} camera (attempt ${reconnectAttempts[camera]})`);
         if (camera === 'front') {
-          frontCameraWs = new WebSocket(Config.getSocketUrl(Config.IPs.DEV2, 8081));
+          frontCameraWs = new WebSocket(`ws://${host}:8081/ws`);
           connectCameraWebSocket('front', frontCameraWs, frontVideoStream, frontCanvas, frontCtx, frontTimestampCheckbox, captureFrontImageButton, toggleFrontStreamButton);
         } else {
-          backCameraWs = new WebSocket(Config.getSocketUrl(Config.IPs.DEV2, 8082));
+          backCameraWs = new WebSocket(`ws://${host}:8082/ws`);
           connectCameraWebSocket('back', backCameraWs, backVideoStream, backCanvas, backCtx, backTimestampCheckbox, captureBackImageButton, toggleBackStreamButton);
         }
       }, delay);
@@ -593,7 +593,7 @@ function connectImageWebSocket() {
     console.log('Image service disconnected');
     // Auto-reconnect image service
     setTimeout(() => {
-      imageWs = new WebSocket(Config.getSocketUrl(window.location.hostname, 3000) + '/ws');
+      imageWs = new WebSocket(`ws://${host}:3000/ws`);
       connectImageWebSocket();
     }, 2000);
   };
@@ -605,7 +605,7 @@ function connectImageWebSocket() {
 function connectTemperatureWebSocket() {
   if (temperatureWs && temperatureWs.readyState === WebSocket.OPEN) return;
  
-  temperatureWs = new WebSocket(Config.getSocketUrl(Config.IPs.DEV2, TEMPERATURE_CONFIG.WS_PORT) + '/ws');
+  temperatureWs = new WebSocket(`ws://${host}:8083/ws`);
  
   temperatureWs.onopen = () => {
     console.log('Temperature WebSocket connected');
@@ -1336,7 +1336,6 @@ function setupModalFrameListener() {
 
 function getLocalWindowsTime() {
   const now = new Date();
-
   const year   = now.getFullYear();
   const month  = String(now.getMonth() + 1).padStart(2, '0');
   const day    = String(now.getDate()).padStart(2, '0');
@@ -1386,6 +1385,12 @@ function connectTimeServer() {
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
+  if (recordFrontButton) {
+  recordFrontButton.addEventListener('click', () => toggleRecording('front'));
+}
+if (recordBackButton) {
+  recordBackButton.addEventListener('click', () => toggleRecording('back'));
+}
 connectTimeServer();
 setTimeout(() => {
   if (frontCameraWs && frontCameraWs.readyState === WebSocket.OPEN && recordFrontButton) {
@@ -1443,10 +1448,10 @@ if (syncTimeBtn) {
       const camera = button.dataset.camera;
       const action = button.dataset.action;
      
-      if (action === 'record') {
-        toggleRecording(camera);
-        return;
-      }
+      // if (action === 'record') {
+      //   toggleRecording(camera);
+      //   return;
+      // }
       if (action === 'capture') {
         const lastImage = lastCapturedImages[camera];
        
@@ -1512,7 +1517,7 @@ if (syncTimeBtn) {
       } else if (action === 'toggle') {
         isPaused[camera] = !isPaused[camera];
         updateToggleButtonUI(camera);
-        showStatusMessage(isPaused[camera] ? `${camera} paused` : `${camera} resumed`, 1000);
+        //showStatusMessage(isPaused[camera] ? `${camera} paused` : `${camera} resumed`, 1000);
       } else if (action === 'settings') {
         toggleSettingsMenu(camera);
       }
@@ -1637,66 +1642,74 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // NEW: Toggle recording function
+// Recording state
+
 function toggleRecording(camera) {
-  if (recordingState[camera]) {
-    // Stop recording
+  console.log('into toggle recording: ' + camera);
+  const ws = camera === 'front' ? frontCameraWs : backCameraWs;  // or imageWs if you route through image manager
+  const recordBtn = camera === 'front' ? recordFrontButton : recordBackButton;
+  const customNameInput = camera === 'front' ? customFileNameInputFront : customFileNameInputBack;
+  const customName = customNameInput ? customNameInput.value.trim() : '';
+  console.log('state: ' + recordingState[camera]);
+  if (recordingState[camera]) { // if the camera is recording
+    console.log(camera + ' is recording, stopping');
+    // STOP RECORDING
     recordingState[camera] = false;
-    const frames = recordedFrames[camera];
-    console.log('Stopping recording, frames length:', frames.length);
-    recordedFrames[camera] = []; // Clear frames
-    const customName = (camera === 'front' ? customFileNameInputFront : customFileNameInputBack)?.value?.trim() || '';
-    const fpsSelect = camera === 'front' ? frontFramerateSelect : backFramerateSelect;
-    const fps = parseInt(fpsSelect.value, 10) || 30;
-    const resolutionSelect = camera === 'front' ? frontResolutionSelect : backResolutionSelect;
-    const resolution = resolutionSelect.value;
-    if (imageWs.readyState === WebSocket.OPEN && frames.length > 0) {
-      imageWs.send(JSON.stringify({
-        action: 'save_video',
-        door: camera,
-        frames: frames.map(base64 => ({ data: base64 })),
-        timestamp: Date.now(),
-        customName: customName,
-        fps: fps,
-        resolution: resolution
-      }));
-      showStatusMessage(`Video saved from ${camera}`, 2000);
-    } else if (frames.length === 0) {
-      showStatusMessage(`No frames captured for ${camera} video`, 2000);
+    updateRecordButtonUI(camera);
+
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ action: 'stop_record' }));
+      showStatusMessage(`Recording stopped for ${camera} - saving video...`, 2000);
     } else {
-      showStatusMessage('Image service unavailable', 2000);
+      showStatusMessage('Camera server not connected', 2000);
     }
+
   } else {
-    // Start recording
+    console.log(camera + ' is not recording, starting')
     if (isPaused[camera]) {
       isPaused[camera] = false;
       updateToggleButtonUI(camera);
-      showStatusMessage(`${camera} stream resumed for recording`, 1000);
     }
-    recordingState[camera] = true;
-    recordedFrames[camera] = [];
-    lastRecordTime[camera] = 0;
-    showStatusMessage(`Recording ${camera} started`, 1000);
-    setTimeout(() => {
-      if (recordingState[camera]) toggleRecording(camera); // Auto-stop after max duration
-    }, maxRecordDuration);
-  }
-  updateRecordButtonUI(camera);
-}
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ 
+        action: 'start_record',
+        filename: customName || undefined 
+      }));
+   
+      recordingState[camera] = true;
+      console.log('recording: ' + camera)
 
-function updateRecordButtonUI(camera) {
-  const recordButton = camera === 'front' ? recordFrontButton : recordBackButton;
-  if (recordButton) {
-    const span = recordButton.querySelector('span');
-    const icon = recordButton.querySelector('i');
-    if (recordingState[camera]) {
-      recordButton.classList.add('recording');
-      if (span) span.textContent = 'Stop';
-      if (icon) icon.className = 'fa-solid fa-stop';
+      updateRecordButtonUI(camera);
+
+      showStatusMessage(`Recording started for ${camera}`, 1500);
+
+      // Optional auto-stop
+      setTimeout(() => {
+        if (recordingState[camera]) toggleRecording(camera);
+      }, maxRecordDuration || 30000);
+
     } else {
-      recordButton.classList.remove('recording');
-      if (span) span.textContent = 'Record';
-      if (icon) icon.className = 'fa-solid fa-video';
+      showStatusMessage('Camera server not connected', 2000);
+      recordingState[camera] = false;
+      updateRecordButtonUI(camera);
     }
+  }
+}
+function updateRecordButtonUI(camera) {
+  const btn = camera === 'front' ? recordFrontButton : recordBackButton;
+  if (!btn) return;
+
+  const span = btn.querySelector('span');
+  const icon = btn.querySelector('i');
+
+  if (recordingState[camera]) {
+    btn.classList.add('recording');
+    if (span) span.textContent = 'Stop Recording';
+    if (icon) icon.className = 'fa-solid fa-stop';
+  } else {
+    btn.classList.remove('recording');
+    if (span) span.textContent = 'Record Video';
+    if (icon) icon.className = 'fa-solid fa-video';
   }
 }
 
@@ -1838,10 +1851,10 @@ if (syncTimeBtn) {
   // Reconnect with fresh config
   setTimeout(() => {
     if (camera === 'front') {
-      frontCameraWs = new WebSocket(Config.getSocketUrl(Config.IPs.DEV, 8081));
+      frontCameraWs = new WebSocket(`ws://${host}:8081/ws`);
       connectCameraWebSocket('front', frontCameraWs, frontVideoStream, frontCanvas, frontCtx, frontTimestampCheckbox, captureFrontImageButton, toggleFrontStreamButton);
     } else {
-      backCameraWs = new WebSocket(Config.getSocketUrl(Config.IPs.DEV, 8082));
+      backCameraWs = new WebSocket(`ws://${host}:8082/ws`);
       connectCameraWebSocket('back', backCameraWs, backVideoStream, backCanvas, backCtx, backTimestampCheckbox, captureBackImageButton, toggleBackStreamButton);
     }
     showStatusMessage(`${camera} camera restarted with new settings`, 2000);
