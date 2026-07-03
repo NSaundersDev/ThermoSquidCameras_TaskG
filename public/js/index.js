@@ -145,63 +145,86 @@ function showStatusMessage(message, duration = 1500) {
   statusMessage.dataset.timeoutId = timeoutId;
 }
 
-// Fixed timestamp drawing with proper image scaling
 function drawTimestamp(imageElement, canvas, ctx, door, timestamp, timestampCheckbox) {
   if (!timestampCheckbox?.checked || !canvas || !ctx || !imageElement.complete) {
     if (canvas) canvas.style.display = 'none';
     imageElement.style.display = 'block';
     return;
   }
+
   // Set canvas to the image's natural dimensions (full resolution)
   const imgWidth = imageElement.naturalWidth || 1080;
   const imgHeight = imageElement.naturalHeight || 720;
   canvas.width = imgWidth;
   canvas.height = imgHeight;
- 
+
   // Get the container for positioning the canvas overlay
   const container = canvas.parentElement;
   const containerRect = container.getBoundingClientRect();
- 
+
   // Clear canvas and draw the full-resolution image
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(imageElement, 0, 0, imgWidth, imgHeight);
-  // Add timestamp overlay at full resolution
+
+  // === Styling ===
   ctx.font = 'bold 35px Arial';
-  ctx.fillStyle = 'white';
-  ctx.strokeStyle = 'black';
   ctx.lineWidth = 2;
 
-  const text = `${new Date(timestamp).toLocaleString()}`;
-  ctx.strokeText(text, 10, 40);
-  ctx.fillText(text, 10, 40);
- 
+  const dateObj = new Date(timestamp);
+  const timeText = dateObj.toLocaleTimeString();
+  const dateText = dateObj.toLocaleDateString();
+
+  // Short camera label
+  const shortLabel = door === 'front' ? 'Cam1' : 'Cam2';
+
+  // === LEFT: Cam1 / Cam2 in GREEN ===
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#22c55e';      // Green color
+  ctx.strokeStyle = 'black';
+  ctx.strokeText(shortLabel, 10, 40);
+  ctx.fillText(shortLabel, 10, 40);
+
+  // === RIGHT: Timestamp in WHITE ===
+  ctx.textAlign = 'right';
+  ctx.fillStyle = 'white';        // Back to white for timestamp
+  ctx.strokeStyle = 'black';
+  ctx.size = '1em';
+  const dateTime = timeText + "  " + dateText;
+  // Time
+  ctx.strokeText(dateTime, canvas.width - 20, 40);
+    ctx.fillText(dateTime, canvas.width - 20, 40);
+
+
+  // // Date
+  // ctx.strokeText(dateText, canvas.width - 20, 40);
+  // ctx.fillText(dateText, canvas.width - 20, 80);
+
+  // Reset alignment
+  ctx.textAlign = 'left';
+
   // Position the canvas to match the image's display in the container
-  // This ensures the overlay lines up perfectly with the image
   const containerWidth = containerRect.width;
   const containerHeight = containerRect.height;
   const containerAspect = containerWidth / containerHeight;
   const imgAspect = imgWidth / imgHeight;
- 
+
   let scaleX, scaleY, offsetX, offsetY;
- 
+
   if (imgAspect > containerAspect) {
-    // Image is wider - scale to height
     scaleY = containerHeight / imgHeight;
     scaleX = scaleY;
     offsetX = (containerWidth - (imgWidth * scaleX)) / 2;
     offsetY = 0;
   } else {
-    // Image is taller - scale to width
     scaleX = containerWidth / imgWidth;
     scaleY = scaleX;
     offsetX = 0;
     offsetY = (containerHeight - (imgHeight * scaleY)) / 2;
   }
- 
-  // Apply the transform: scale first, then translate (order matters for correct positioning)
+
   canvas.style.transform = `scale(${scaleX}) translate(${offsetX}px, ${offsetY}px)`;
   canvas.style.transformOrigin = 'top left';
- 
+
   canvas.style.display = 'block';
   imageElement.style.display = 'none';
 }
@@ -252,9 +275,9 @@ function getTimestampedImage(imageElement, door, timestamp, timestampCheckbox) {
           ctx.font = '30px Arial';
           ctx.textAlign = 'center';
           ctx.fillText('No Image', canvas.width / 2, canvas.height / 2);
-          if (timestampCheckbox?.checked) {
-            addTimestampOverlay(ctx, door, timestamp);
-          }
+          // if (timestampCheckbox?.checked) {
+          //   addTimestampOverlay(ctx, door, timestamp);
+          // }
           resolve(canvas.toDataURL('image/jpeg', 0.5)); // Improved fallback quality
         }
       }, 1000);
@@ -297,52 +320,34 @@ function drawImageToCanvas(ctx, imageElement, canvas, door, timestamp, timestamp
 }
 function addTimestampOverlay(ctx, door, timestamp) {
   ctx.font = 'bold 35px Arial';
+  ctx.lineWidth = 2;
+
+  const dateObj = new Date(timestamp);
+  const timeText = dateObj.toLocaleTimeString();
+  const dateText = dateObj.toLocaleDateString();
+
+  // Short label like the live feed
+  const shortLabel = door === 'front' ? 'Cam1' : 'Cam2';
+
+  // === LEFT: Cam1 / Cam2 (green) ===
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#22c55e';      // Green
+  ctx.strokeStyle = 'black';
+  ctx.strokeText(shortLabel, 10, 40);
+  ctx.fillText(shortLabel, 10, 40);
+
+  // === RIGHT: Time + Date (white, right aligned) ===
+  ctx.textAlign = 'right';
   ctx.fillStyle = 'white';
   ctx.strokeStyle = 'black';
-  ctx.lineWidth = 2;
-  const text = `${door.charAt(0).toUpperCase() + door.slice(1)}: ${new Date(timestamp).toLocaleString()}`;
-  ctx.strokeText(text, 10, 40);
-  ctx.fillText(text, 10, 40);
-}
-function showCaptureFeedback(path = '') {
-  const filename = path ? path.split('/').pop() : 'image.jpg';
-  showStatusMessage(`Captured: ${filename}`, 2000);
- 
-  // Determine which camera to flash based on filename
-  let camera = 'front';
-  if (filename.toLowerCase().includes('back')) {
-    camera = 'back';
-  }
- 
-  console.log(`Showing feedback for ${camera} camera`);
- 
-  // Flash the CORRECT camera feed
-  const cameraVideoContainer = camera === 'front' ?
-    document.querySelector('.front-camera-section .video-container') :
-    document.querySelector('.back-camera-section .video-container');
- 
-  if (cameraVideoContainer) {
-    console.log(`Flashing ${camera} camera feed:`, cameraVideoContainer);
-   
-    // Remove any existing flash class
-    cameraVideoContainer.classList.remove('camera-flash');
-   
-    // Force reflow to restart animation
-    cameraVideoContainer.offsetHeight;
-   
-    // Add flash class to trigger animation
-    cameraVideoContainer.classList.add('camera-flash');
-   
-    // Remove after animation completes
-    setTimeout(() => {
-      cameraVideoContainer.classList.remove('camera-flash');
-      console.log(`${camera} flash completed`);
-    }, 600);
-  } else {
-    console.warn(`Could not find video container for ${camera} camera`);
-  }
- 
-  console.log(`Image saved: ${filename}`);
+
+  const dateTime = timeText + " " + dateText;
+  // Time on top right
+  ctx.strokeText(dateTime, ctx.canvas.width - 20, 40);
+  ctx.fillText(dateTime, ctx.canvas.width - 20, 40);
+
+  // Reset alignment
+  ctx.textAlign = 'left';
 }
 // Temperature utility functions
 function formatTemperature(temp, showFahrenheit) {
@@ -1640,6 +1645,13 @@ document.addEventListener('visibilitychange', () => {
     });
   }
 });
+
+// Helper to get nice camera name for overlays and UI
+function getCameraLabel(door) {
+  if (door === 'front') return 'Cam1';
+  if (door === 'back')  return 'Cam2';
+  return door;
+}
 
 // NEW: Toggle recording function
 // Recording state

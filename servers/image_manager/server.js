@@ -47,69 +47,107 @@ async function ensureDir(door, date) {
   await fs.mkdir(dir, { recursive: true });
   return dir;
 }
-async function listImages(door = null, date = null) {
-  const files = [];
 
-  // === IMAGES (always get all) ===
- try {
-    const clips = await fs.readdir(clipsDir).catch(() => []);
-    for (const file of clips) {
-      if (file.match(/\.(mp4|webm|mov)$/i)) {
-        const match = file.match(/_(\d+)\./);
-        if (!match) continue;
 
-        const timestamp = parseInt(match[1], 10);
-        const clipDate = new Date(timestamp).toISOString().split('T')[0];
+async function listImages(doorFilter = null, dateFilter = null) {
+  const results = [];
 
-        // Apply date filter if one is selected
-        if (date && clipDate !== date) continue;
+  // === IMAGES from baseDir (front/back) - using actual file mtime ===
+  const doorsToScan = (doorFilter && ['front', 'back'].includes(doorFilter))
+    ? [doorFilter]
+    : ['front', 'back'];
 
-        files.push({
-          door: 'all',
+  for (const door of doorsToScan) {
+    const doorPath = path.join(baseDir, door);
+
+    let dateDirs = [];
+    try {
+      dateDirs = await fs.readdir(doorPath);
+    } catch {
+      continue;
+    }
+
+    for (const dateDir of dateDirs) {
+      if (dateFilter && dateDir !== dateFilter) continue;
+
+      const fullDatePath = path.join(doorPath, dateDir);
+      let files = [];
+      try {
+        files = await fs.readdir(fullDatePath);
+      } catch {
+        continue;
+      }
+
+      for (const file of files) {
+        if (!file.match(/\.(jpg|jpeg|png)$/i)) continue;
+
+        const fullPath = path.join(fullDatePath, file);
+
+        // Use actual file modification time
+        let timestamp;
+        try {
+          const stats = await fs.stat(fullPath);
+          timestamp = stats.mtimeMs;
+        } catch {
+          // Fallback to filename if stat fails
+          const match = file.match(/^(\d+)-/);
+          timestamp = match ? parseInt(match[1], 10) : Date.now();
+        }
+
+        if (isNaN(timestamp)) continue;
+
+        results.push({
+          door: door,
           timestamp,
-          path: `/clips/${file}`,
+          path: `/images/${door}/${dateDir}/${file}`,
           name: file,
           type: 'image'
         });
       }
     }
-  } catch (err) {
-    console.error('Error reading clips directory:', err.message);
   }
 
-  // === VIDEO CLIPS (always get all) ===
- // === VIDEO CLIPS (with proper date filtering) ===
-try {
-    const clips = await fs.readdir(clipsDir).catch(() => []);
-    for (const file of clips) {
-      if (file.match(/\.(mp4|webm|mov)$/i)) {
+  // === VIDEO CLIPS - using actual file mtime ===
+  try {
+    const clipFiles = await fs.readdir(clipsDir).catch(() => []);
+
+    for (const file of clipFiles) {
+      if (!file.match(/\.(mp4|webm|mov)$/i)) continue;
+
+      const fullPath = path.join(clipsDir, file);
+
+      let timestamp;
+      try {
+        const stats = await fs.stat(fullPath);
+        timestamp = stats.mtimeMs;
+      } catch {
+        // Fallback to filename
         const match = file.match(/_(\d+)\./);
-        if (!match) continue;
-
-        const timestamp = parseInt(match[1], 10);
-        if (isNaN(timestamp)) continue;
-
-        // === DATE FILTER LOGIC FOR CLIPS ===
-        if (date) {
-          const clipDate = new Date(timestamp).toISOString().split('T')[0];
-          if (clipDate !== date) {
-            continue; // Skip this clip if date doesn't match
-          }
-        }
-
-        files.push({
-          door: 'all',
-          timestamp,
-          path: `/clips/${file}`,
-          name: file,
-          type: 'video'
-        });
+        timestamp = match ? parseInt(match[1], 10) : Date.now();
       }
+
+      if (isNaN(timestamp)) continue;
+
+      // Date filter
+      if (dateFilter) {
+        const clipDate = new Date(timestamp).toISOString().split('T')[0];
+        if (clipDate !== dateFilter) continue;
+      }
+
+      results.push({
+        door: 'all',
+        timestamp,
+        path: `/clips/${file}`,
+        name: file,
+        type: 'video'
+      });
     }
   } catch (err) {
     console.error('Error reading clips directory:', err.message);
   }
-  return files.sort((a, b) => b.timestamp - a.timestamp);
+
+  // Sort newest first
+  return results.sort((a, b) => b.timestamp - a.timestamp);
 }
 const wss = new WebSocket.Server({ server: app.listen(port, '0.0.0.0'), path: '/ws' });
 wss.on('connection', (ws) => {
@@ -212,17 +250,26 @@ wss.on('connection', (ws) => {
      } else if (data.action === 'delete_image') {
   const { door, timestamp, path: itemPath } = data;
 
-  // === VIDEO CLIP DELETION ===
-  if (itemPath && itemPath.startsWith('/clips/')) {
-    const filename = path.basename(itemPath);
-    const fullPath = path.join(clipsDir, filename);
+  // === If we have a full path, use it directly (best method) ===
+  if (itemPath) {
+    let fullPath;
+
+    if (itemPath.startsWith('/clips/')) {
+      fullPath = path.join(clipsDir, path.basename(itemPath));
+    } else if (itemPath.startsWith('/images/')) {
+      fullPath = path.join(baseDir, itemPath.replace('/images/', ''));
+    } else {
+      ws.send(JSON.stringify({ status: 'error', message: 'Invalid path' }));
+      return;
+    }
 
     try {
       await fs.unlink(fullPath);
-      console.log(`Deleted video clip: ${fullPath}`);
-      ws.send(JSON.stringify({ status: 'deleted', door, timestamp, type: 'video' }));
+      console.log(`Deleted: ${fullPath}`);
 
-      // Refresh gallery for everyone
+      ws.send(JSON.stringify({ status: 'deleted', door, timestamp }));
+
+      // Refresh gallery
       const allMedia = await listImages(door || 'all');
       wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN) {
@@ -230,13 +277,13 @@ wss.on('connection', (ws) => {
         }
       });
     } catch (err) {
-      console.error('Failed to delete clip:', err);
-      ws.send(JSON.stringify({ status: 'error', message: 'Failed to delete video clip' }));
+      console.error('Delete failed:', err);
+      ws.send(JSON.stringify({ status: 'error', message: 'Failed to delete file' }));
     }
     return;
   }
 
-  // === IMAGE DELETION (original logic) ===
+  // === Fallback: old method using door + timestamp (for very old data) ===
   if (!['front', 'back'].includes(door) || !timestamp) {
     ws.send(JSON.stringify({ status: 'error', message: 'Invalid door or timestamp' }));
     return;
@@ -258,7 +305,6 @@ wss.on('connection', (ws) => {
 
   ws.send(JSON.stringify({ status: 'deleted', door, timestamp }));
 
-  // Refresh gallery
   const images = await listImages(door, date);
   wss.clients.forEach(client => {
     if (client.readyState === WebSocket.OPEN) {

@@ -149,6 +149,7 @@ main {
 }
 
 .modal-actions button {
+  margin-bottom: 1em;
   background-color: #007bff;
   padding: 0.4rem 0.8rem; /* Slightly smaller */
   border-radius: 4px;
