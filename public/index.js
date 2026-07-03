@@ -1747,13 +1747,12 @@ function applyCameraSettings(camera) {
   const resolutionSelect = camera === 'front' ? frontResolutionSelect : backResolutionSelect;
   const framerateSelect = camera === 'front' ? frontFramerateSelect : backFramerateSelect;
   const [width, height] = resolutionSelect.value.split('x');
-  const framerate = parseInt(framerateSelect.value);
 
   const settings = {
     action: 'set_config',
     width: parseInt(width),
     height: parseInt(height),
-    framerate: framerate,
+    framerate: parseInt(framerateSelect.value),
     brightness: parseFloat(document.getElementById(`${camera}-brightness`).value) || 0,
     contrast: parseFloat(document.getElementById(`${camera}-contrast`).value) || 1,
     sharpness: parseFloat(document.getElementById(`${camera}-sharpness`).value) || 1,
@@ -1769,109 +1768,15 @@ function applyCameraSettings(camera) {
     denoise: document.getElementById(`${camera}-denoise`).value || 'auto'
   };
 
-  let timeWs = null;
-
-function connectTimeServer() {
-  const host = window.location.hostname;
-  console.log(`[Time] Trying to connect to ws://${host}:3002`);
-
-
-  timeWs = new WebSocket(`ws://${host}:3002`);
-
-  timeWs.onopen = () => {
-    console.log('%c[Time] ✅ Connected to time server', 'color: limegreen');
-    showStatusMessage('Time server connected', 2000);
-  };
-
-  timeWs.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      if (data.type === 'success') {
-        alert("✅ Time Sync Successful!\n\n" + data.message);
-      }
-      if (data.type === 'error') {
-        alert("❌ Time Sync Failed:\n" + data.message);
-      }
-    } catch (e) {}
-  };
-
-  timeWs.onclose = () => {
-    console.log('%c[Time] ❌ Disconnected from time server', 'color: red');
-    showStatusMessage('Time server disconnected', 2000);
-  };
-
-  timeWs.onerror = (err) => {
-    console.error('%c[Time] Connection error', 'color: orange', err);
-    showStatusMessage('Time server connection failed', 3000);
-  };
-
-  // Sync button
-const syncTimeBtn = document.getElementById('sync-time-btn');
-if (syncTimeBtn) {
-  syncTimeBtn.addEventListener('click', () => {
-    if (!timeWs || timeWs.readyState !== WebSocket.OPEN) {
-      alert("Time server is NOT connected.\nCheck console for errors.");
-      return;
-    }
-
-    const now = new Date();
-    const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ` +
-                    `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
-
-    timeWs.send(JSON.stringify({
-      type: 'sync-time',
-      time: timeStr,
-      password: 'Lasers4Life'
-    }));
-
-    showStatusMessage('Sending time to server...', 1500);
-  });
-}
-
-  showStatusMessage(`${camera.toUpperCase()} settings applied – restarting stream...`, 3000);
-}
-
-
-
-
   const cameraWs = camera === 'front' ? frontCameraWs : backCameraWs;
 
-  // ──────────────────────────────────────────────────────────────
-  // CRITICAL FIX: Send config even if connection is closing/closed
-  // The server restarts rpicam-vid immediately → old socket dies
-  // ──────────────────────────────────────────────────────────────
-  const sendConfig = () => {
-    if (cameraWs.readyState === WebSocket.OPEN) {
-      cameraWs.send(JSON.stringify(settings));
-    } else if (cameraWs.readyState === WebSocket.CONNECTING) {
-      // Still connecting → queue it
-      setTimeout(sendConfig, 100);
-    }
-    // If CLOSED or CLOSING → the reconnect in connectCameraWebSocket() will start the new process with the OLD config
-    // → so we store it temporarily and re-apply on next open
-    else {
-      window.pendingCameraConfig = window.pendingCameraConfig || {};
-      window.pendingCameraConfig[camera] = settings;
-    }
-  };
-  sendConfig();
-  setTimeout(() => {
-  const ws = camera === 'front' ? frontCameraWs : backCameraWs;
-  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
-    ws.close();
+  if (cameraWs && cameraWs.readyState === WebSocket.OPEN) {
+    cameraWs.send(JSON.stringify(settings));
+    showStatusMessage(`${camera} settings applied`, 2000);
+    console.log(`Sent settings for ${camera}:`, settings);
+  } else {
+    showStatusMessage(`${camera} camera not connected`, 2000);
   }
-  // Reconnect with fresh config
-  setTimeout(() => {
-    if (camera === 'front') {
-      frontCameraWs = new WebSocket(`ws://${host}:8081/ws`);
-      connectCameraWebSocket('front', frontCameraWs, frontVideoStream, frontCanvas, frontCtx, frontTimestampCheckbox, captureFrontImageButton, toggleFrontStreamButton);
-    } else {
-      backCameraWs = new WebSocket(`ws://${host}:8082/ws`);
-      connectCameraWebSocket('back', backCameraWs, backVideoStream, backCanvas, backCtx, backTimestampCheckbox, captureBackImageButton, toggleBackStreamButton);
-    }
-    showStatusMessage(`${camera} camera restarted with new settings`, 2000);
-  }, 500);
-}, 1500);
 }
 window.addEventListener('beforeunload', () => {
   navigator.sendBeacon?.('/api/camera/stop', '');
