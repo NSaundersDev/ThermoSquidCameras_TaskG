@@ -68,6 +68,7 @@
           
           currentPage = 1;
           renderImages();
+        
         } 
         else if (data.status === 'deleted' || data.status === 'deleted_old') {
           showStatus(data.status === 'deleted' 
@@ -131,6 +132,15 @@ function getDoorLabel(door) {
   return door; // fallback
 }
 
+function doStuff(path) {
+   const a = document.createElement('a');
+        a.href = path;
+        a.download = path.split('/').pop();
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+}
+
 function renderImages() {
     if (isRendering) return;
     isRendering = true;
@@ -186,8 +196,12 @@ function renderImages() {
           </span>
         </div>
         <button class="view-btn">View</button>
+        <button class="download" id="modal-download2">Download</button>
       `;
-
+      card.querySelector('.download').onclick = () => {
+       doStuff(img.path);
+    
+      }
       card.querySelector('.view-btn').onclick = () => {
         showModal(img.path, img.door, img.timestamp, isVideo);
       };
@@ -217,6 +231,7 @@ function renderImages() {
   function changePage(page) {
     currentPage = page;
     renderImages();
+
   }
 
   function showModal(path, door, timestamp, isVideo = false) {
@@ -233,6 +248,15 @@ function renderImages() {
 
   // Download using path (works for clips + future images)
   document.getElementById('modal-download').onclick = () => {
+    const a = document.createElement('a');
+    a.href = path;
+    a.download = path.split('/').pop();
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+    document.getElementById('modal-download2').onclick = () => {
     const a = document.createElement('a');
     a.href = path;
     a.download = path.split('/').pop();

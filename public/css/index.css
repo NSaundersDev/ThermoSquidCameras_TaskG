@@ -2197,3 +2197,20 @@ width: 100%;
 .apply-settings-btn i {
   font-size: 1rem;
 }
+
+
+/* Remove hover zoom/scale on video feeds */
+.video-wrapper:hover,
+.video-container:hover,
+.camera-feed:hover,
+.camera-section:hover .video-wrapper,
+.camera-panel:hover .video-wrapper {
+  transform: none !important;
+  transition: none !important;
+  box-shadow: none !important;
+}
+
+/* Keep the zoom-in cursor (since clicking opens the modal) */
+.video-wrapper {
+  cursor: zoom-in;
+}
