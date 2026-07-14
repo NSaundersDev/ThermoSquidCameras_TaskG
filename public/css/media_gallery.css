@@ -261,3 +261,7 @@ main {
 h1 {
   text-decoration: underline;
 }
+
+.view-btn {
+  margin-top: 1em;
+}
