@@ -219,6 +219,10 @@ body {
   background: var(--button-primary);
   border-color: #fff;
 }
+.session-btn.is-stop {
+  background: #8d2b2b;
+  border-color: #6e1f1f;
+}
 .session-live {
   grid-column: 1 / -1;
   grid-row: 1;

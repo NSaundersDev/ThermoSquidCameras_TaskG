@@ -2014,13 +2014,26 @@ function updateSessionControls() {
   const active = sessionState.active;
   const started = sessionState.startedAt > 0;
   document.getElementById('session-bar').classList.toggle('is-running', active);
-  document.getElementById('session-start').hidden = active;
-  document.getElementById('session-stop').hidden = !active;
   document.getElementById('session-input').hidden = !active;
   document.getElementById('session-live').hidden = !started;
   document.getElementById('session-side').hidden = !started;
+  const start = document.getElementById('session-start');
+  const icon = start.querySelector('i');
+  const label = start.querySelector('span');
   const nameOk = Boolean(fileToken(document.getElementById('session-name').value, ''));
-  document.getElementById('session-start').disabled = active || !nameOk || readExpectedInputs() == null;
+  if (active) {
+    start.disabled = false;
+    start.classList.add('is-stop');
+    if (icon) icon.className = 'fa-solid fa-stop';
+    if (label) label.textContent = 'Stop';
+    start.setAttribute('aria-label', 'Stop session');
+  } else {
+    start.classList.remove('is-stop');
+    if (icon) icon.className = 'fa-solid fa-play';
+    if (label) label.textContent = 'Start';
+    start.setAttribute('aria-label', 'Start session');
+    start.disabled = !nameOk || readExpectedInputs() == null;
+  }
 }
 
 function updateSessionProgress() {
@@ -2154,8 +2167,10 @@ function initSessionUi() {
   });
   document.getElementById('session-name').addEventListener('input', updateSessionControls);
   document.getElementById('session-input-count').addEventListener('input', updateSessionControls);
-  document.getElementById('session-start').addEventListener('click', startSession);
-  document.getElementById('session-stop').addEventListener('click', () => endSession());
+  document.getElementById('session-start').addEventListener('click', () => {
+    if (sessionState.active) endSession();
+    else startSession();
+  });
   document.getElementById('session-input').addEventListener('click', recordSessionInput);
   updateSessionControls();
 }
