@@ -1495,7 +1495,7 @@ const CAMERA_SETTING_GROUPS = [
       { type: 'slider', id: 'contrast', label: 'Contrast', min: 0, max: 32, step: 0.1, value: 1 },
       { type: 'slider', id: 'sharpness', label: 'Sharpness', min: 0, max: 16, step: 0.1, value: 1 },
       { type: 'slider', id: 'saturation', label: 'Saturation', min: 0, max: 32, step: 0.1, value: 1 },
-      { type: 'slider', id: 'ev', label: 'EV', title: 'Exposure value', min: -10, max: 10, step: 1, value: 0 }
+      { type: 'slider', id: 'ev', label: 'EV', title: 'Exposure value', min: -8, max: 8, step: 1, value: 0 }
     ]
   },
   {
@@ -1538,16 +1538,15 @@ const CAMERA_SETTING_GROUPS = [
           ['off', 'Manual']
         ]
       },
-      { type: 'slider', id: 'awb-red', label: 'Red gain', hint: 'Manual white balance', min: 0, max: 8, step: 0.1, value: 0, awbGain: true },
-      { type: 'slider', id: 'awb-blue', label: 'Blue gain', hint: 'Manual white balance', min: 0, max: 8, step: 0.1, value: 0, awbGain: true },
+      { type: 'slider', id: 'awb-red', label: 'Red gain', hint: 'Manual white balance', min: 0.1, max: 8, step: 0.1, value: 1, awbGain: true },
+      { type: 'slider', id: 'awb-blue', label: 'Blue gain', hint: 'Manual white balance', min: 0.1, max: 8, step: 0.1, value: 1, awbGain: true },
       {
         type: 'select', id: 'denoise', label: 'Denoise',
         options: [
           ['auto', 'Auto'],
           ['off', 'Off'],
           ['cdn_off', 'CDN Off'],
-          ['cdn_fast', 'CDN Fast'],
-          ['cdn_hq', 'CDN HQ']
+          ['cdn_fast', 'CDN Fast']
         ]
       }
     ]
@@ -1718,14 +1717,14 @@ function applyCameraSettings(camera) {
     contrast: readSettingNumber(`${camera}-contrast`, 1),
     sharpness: readSettingNumber(`${camera}-sharpness`, 1),
     saturation: readSettingNumber(`${camera}-saturation`, 1),
-    ev: readSettingNumber(`${camera}-ev`, 0),
+    ev: Math.round(readSettingNumber(`${camera}-ev`, 0)),
     shutter: Math.round(readSettingNumber(`${camera}-shutter`, 0)),
     gain: readSettingNumber(`${camera}-gain`, 0),
     metering: document.getElementById(`${camera}-metering`).value || 'centre',
     exposure: document.getElementById(`${camera}-exposure`).value || 'normal',
     awb: document.getElementById(`${camera}-awb`).value || 'auto',
-    awb_red: readSettingNumber(`${camera}-awb-red`, 0),
-    awb_blue: readSettingNumber(`${camera}-awb-blue`, 0),
+    awb_red: readSettingNumber(`${camera}-awb-red`, 1),
+    awb_blue: readSettingNumber(`${camera}-awb-blue`, 1),
     denoise: document.getElementById(`${camera}-denoise`).value || 'auto'
   };
 
