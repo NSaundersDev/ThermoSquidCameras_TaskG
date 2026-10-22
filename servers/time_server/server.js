@@ -91,5 +91,4 @@ wss.on('connection', (ws, req) => {
 // Start server on all interfaces
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Time server running on ws://0.0.0.0:${PORT}`);
-  console.log(`Accessible from other devices at: ws://192.168.1.26:${PORT}`);
 });

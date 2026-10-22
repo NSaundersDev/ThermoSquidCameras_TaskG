@@ -4,7 +4,6 @@ let frontCameraWs = new WebSocket(`ws://${host}:8081/ws`);
 let backCameraWs = new WebSocket(`ws://${host}:8082/ws`);
 let imageWs = new WebSocket(`ws://${host}:3000/ws`);
 let temperatureWs = null;
-const activeMoves = new Map();
 let reconnectAttempts = { front: 0, back: 0 }; // Camera-specific
 const maxReconnectAttempts = 5;
 const reconnectDelay = 2000;
@@ -12,24 +11,6 @@ const lastCapturedImages = { front: null, back: null };
 let isPaused = { front: false, back: false };
 let invalidFrameCounts = { front: 0, back: 0 };
 const maxInvalidFrames = 5;
-// Recording State
-const recordingState = { front: false, back: false };
-const recordedFrames = { front: [], back: [] };
-const maxRecordDuration = 30000; // 30s max
-const recordFps = 10; // 10fps for clips
-const recordInterval = 1000 / recordFps; // 100ms
-let lastRecordTime = { front: 0, back: 0 };
-// Timer states
-const stopwatchState = {
-  front: { elapsed: 0, isRunning: false, direction: null, interval: null },
-  back: { elapsed: 0, isRunning: false, direction: null, interval: null },
-  both: { elapsed: 0, isRunning: false, direction: null, interval: null }
-};
-const autoTimerState = {
-  front: { remaining: 0, isRunning: false, direction: null, interval: null },
-  back: { remaining: 0, isRunning: false, direction: null, interval: null },
-  both: { remaining: 0, isRunning: false, direction: null, interval: null }
-};
 // UI elements
 const frontVideoStream = document.getElementById('front-video-stream');
 const backVideoStream = document.getElementById('back-video-stream');
@@ -45,8 +26,6 @@ const toggleFrontStreamButton = document.getElementById('toggle-front-stream');
 const toggleBackStreamButton = document.getElementById('toggle-back-stream');
 const captureFrontImageButton = document.getElementById('capture-front-image');
 const captureBackImageButton = document.getElementById('capture-back-image');
-const recordFrontButton = document.getElementById('record-front-video');
-const recordBackButton = document.getElementById('record-back-video');
 const statusMessage = document.getElementById('status-message');
 const settingsFrontButton = document.getElementById('settings-front');
 const settingsBackButton = document.getElementById('settings-back');
@@ -72,7 +51,6 @@ const modalTimestampCheckbox = document.getElementById('modal-timestamp');
 const modalFilenameInput = document.getElementById('modal-filename');
 const modalCaptureBtn = document.getElementById('modal-capture-btn');
 const modalToggleBtn = document.getElementById('modal-toggle-btn');
-const modalRecordBtn = document.getElementById('modal-record-btn');
 const closeModalBtn = document.getElementById('close-modal-btn');
 // Modal state
 let currentModalCamera = null;
@@ -106,19 +84,6 @@ const TEMPERATURE_ALERT_CONFIG = {
 let isAlertVisible = false;
 let alertModal = null;
 
-function formatTime(seconds) {
-  if (isNaN(seconds) || seconds < 0) return '0.0';
-  const wholeSeconds = Math.floor(seconds);
-  const tenths = Math.floor((seconds % 1) * 10);
-  return `${wholeSeconds}.${tenths}`;
-}
-function debounce(fn, ms) {
-  let timeoutId;
-  return function (...args) {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn.apply(this, args), ms);
-  };
-}
 // Status messages - only show helpful ones
 function showStatusMessage(message, duration = 1500) {
   if (!statusMessage) return;
@@ -410,14 +375,7 @@ function connectCameraWebSocket(camera, ws, videoStream, canvas, ctx, timestampC
   reconnectAttempts[camera] = 0;
   isPaused[camera] = false;
 
-  // Enable record button immediately on successful connection
-  const recordBtn = camera === 'front' ? recordFrontButton : recordBackButton;
-  if (recordBtn) {
-    recordBtn.disabled = false;
-    recordBtn.classList.remove('disabled');
-  }
-
-  // Also enable capture button
+  // Enable capture button
   if (captureButton) {
     captureButton.disabled = false;
     captureButton.classList.remove('disabled');
@@ -497,20 +455,6 @@ function connectCameraWebSocket(camera, ws, videoStream, canvas, ctx, timestampC
         //   showStatusMessage(`${camera} feed unstable`, 2000);
         // }
       };
-      // console.log('Frame received, size:', blob.size);
-      if (recordingState[camera]) {
-        if (now - lastRecordTime[camera] > recordInterval) {
-          lastRecordTime[camera] = now;
-          const reader = new FileReader();
-          reader.onload = () => {
-            const base64 = reader.result.replace(/^data:.+;base64,/, '');
-            recordedFrames[camera].push(base64);
-            console.log('Pushing frame, current length: ' + recordedFrames[camera].length);
-          };
-          reader.onerror = () => console.error('FileReader error for', camera);
-          reader.readAsDataURL(blob);
-        }
-      }
     } catch (err) {
       console.warn(`${camera}: frame processing error`, err);
       invalidFrameCounts[camera]++;
@@ -1243,17 +1187,6 @@ function openCameraModal(camera) {
       }
     };
   }
-  // NEW: Modal record button
-  if (modalRecordBtn) {
-    // Remove existing listeners
-    modalRecordBtn.replaceWith(modalRecordBtn.cloneNode(true));
-    const newRecordBtn = document.getElementById('modal-record-btn');
-    newRecordBtn.onclick = () => {
-      if (currentModalCamera) {
-        toggleRecording(currentModalCamera);
-      }
-    };
-  }
   // Close modal handlers
   if (closeModalBtn) {
     // Remove existing listeners
@@ -1282,10 +1215,11 @@ function closeCameraModal() {
     currentModalCamera = null;
     modalIsPaused = false;
    
-    // Reset modal controls
-    if (modalToggleBtn) {
-      const span = modalToggleBtn.querySelector('span');
-      const icon = modalToggleBtn.querySelector('i');
+    // Reset modal controls. openCameraModal replaces the button node, so look it up again.
+    const liveToggleBtn = document.getElementById('modal-toggle-btn');
+    if (liveToggleBtn) {
+      const span = liveToggleBtn.querySelector('span');
+      const icon = liveToggleBtn.querySelector('i');
       if (span && icon) {
         span.textContent = 'Pause';
         icon.className = 'fa-solid fa-pause';
@@ -1390,23 +1324,7 @@ function connectTimeServer() {
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-  if (recordFrontButton) {
-  recordFrontButton.addEventListener('click', () => toggleRecording('front'));
-}
-if (recordBackButton) {
-  recordBackButton.addEventListener('click', () => toggleRecording('back'));
-}
 connectTimeServer();
-setTimeout(() => {
-  if (frontCameraWs && frontCameraWs.readyState === WebSocket.OPEN && recordFrontButton) {
-    recordFrontButton.disabled = false;
-    recordFrontButton.classList.remove('disabled');
-  }
-  if (backCameraWs && backCameraWs.readyState === WebSocket.OPEN && recordBackButton) {
-    recordBackButton.disabled = false;
-    recordBackButton.classList.remove('disabled');
-  }
-}, 600);
 // Sync button handler
 const syncTimeBtn = document.getElementById('sync-time-btn');
 
@@ -1452,11 +1370,7 @@ if (syncTimeBtn) {
       event.preventDefault();
       const camera = button.dataset.camera;
       const action = button.dataset.action;
-     
-      // if (action === 'record') {
-      //   toggleRecording(camera);
-      //   return;
-      // }
+
       if (action === 'capture') {
         const lastImage = lastCapturedImages[camera];
        
@@ -1531,71 +1445,6 @@ if (syncTimeBtn) {
   // Apply settings buttons
   applyFrontSettings.addEventListener('click', () => applyCameraSettings('front'));
   applyBackSettings.addEventListener('click', () => applyCameraSettings('back'));
-  // Door controls
-  document.querySelectorAll('.door-btn, .auto-btn').forEach(button => {
-    const door = button.dataset.door ||
-      (button.id.includes('both') ? 'both' :
-       button.id.includes('front') ? 'front' : 'back');
-   
-    let action;
-    if (button.id.includes('open')) {
-      action = 'start_open';
-    } else if (button.id.includes('close')) {
-      action = 'start_close';
-    }
-   
-    const isAuto = button.classList.contains('auto-btn');
-   
-    if (isAuto && action) {
-      button.addEventListener('click', debounce((event) => {
-        event.preventDefault();
-      
-       
-        const targetDoors = door === 'both' ? ['front', 'back'] : [door];
-        const isMoving = targetDoors.some(d => activeMoves.has(d));
-       
-        if (isMoving) {
-          targetDoors.forEach(d => stopMove(d, 'auto-stop', event.clientX, event.clientY));
-          showStatusMessage(`${door} stopped`, 1000);
-        } else {
-          let seconds;
-          if (door === 'both') {
-            const frontTimeId = action === 'start_open' ? 'front-open-time' : 'front-close-time';
-            const backTimeId = action === 'start_open' ? 'back-open-time' : 'back-close-time';
-            const frontInput = document.getElementById(frontTimeId);
-            const backInput = document.getElementById(backTimeId);
-            seconds = [
-              parseFloat(frontInput?.value || 1.0),
-              parseFloat(backInput?.value || 1.0)
-            ];
-          } else {
-            const timeId = `${door}-${action === 'start_open' ? 'open' : 'close'}-time`;
-            const timeInput = document.getElementById(timeId);
-            seconds = parseFloat(timeInput?.value || 1.0);
-          }
-         
-          startMove(door, action, 'auto-click', event.clientX, event.clientY, seconds);
-          showStatusMessage(`${door} ${action.includes('open') ? 'opening' : 'closing'} for ${Array.isArray(seconds) ? seconds.join('/') : seconds}s`, 1500);
-        }
-      }, 100));
-    } else if (action) {
-      // Manual buttons
-      button.addEventListener('mousedown', (event) => {
-        event.preventDefault();
-        startMove(door, action, 'manual-hold', event.clientX, event.clientY);
-      });
-     
-      button.addEventListener('mouseup', debounce((event) => {
-        event.preventDefault();
-        stopMove(door, 'manual-release', event.clientX, event.clientY);
-      }, 50));
-     
-      button.addEventListener('mouseleave', debounce((event) => {
-        event.preventDefault();
-        stopMove(door, 'manual-leave', event.clientX, event.clientY);
-      }, 50));
-    }
-  });
 
   // Connect WebSockets
   setTimeout(() => {
@@ -1616,8 +1465,6 @@ if (syncTimeBtn) {
 });
 // Cleanup
 window.addEventListener('beforeunload', () => {
-  activeMoves.forEach((_, door) => stopMove(door, 'unload', 0, 0));
- 
   // Clean up WebSocket URLs
   Object.values(lastCapturedImages).forEach(image => {
     if (image && image.image) {
@@ -1629,101 +1476,6 @@ window.addEventListener('beforeunload', () => {
     temperatureWs.close();
   }
 });
-// Handle page visibility changes
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    // Pause timers when tab is hidden
-    Object.keys(stopwatchState).forEach(door => {
-      if (stopwatchState[door].isRunning) {
-        stopStopwatch(door);
-      }
-    });
-    Object.keys(autoTimerState).forEach(door => {
-      if (autoTimerState[door].isRunning) {
-        stopAutoTimer(door);
-      }
-    });
-  }
-});
-
-// Helper to get nice camera name for overlays and UI
-function getCameraLabel(door) {
-  if (door === 'front') return 'Cam1';
-  if (door === 'back')  return 'Cam2';
-  return door;
-}
-
-// NEW: Toggle recording function
-// Recording state
-
-function toggleRecording(camera) {
-  console.log('into toggle recording: ' + camera);
-  const ws = camera === 'front' ? frontCameraWs : backCameraWs;  // or imageWs if you route through image manager
-  const recordBtn = camera === 'front' ? recordFrontButton : recordBackButton;
-  const customNameInput = camera === 'front' ? customFileNameInputFront : customFileNameInputBack;
-  const customName = customNameInput ? customNameInput.value.trim() : '';
-  console.log('state: ' + recordingState[camera]);
-  if (recordingState[camera]) { // if the camera is recording
-    console.log(camera + ' is recording, stopping');
-    // STOP RECORDING
-    recordingState[camera] = false;
-    updateRecordButtonUI(camera);
-
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ action: 'stop_record' }));
-      showStatusMessage(`Recording stopped for ${camera} - saving video...`, 2000);
-    } else {
-      showStatusMessage('Camera server not connected', 2000);
-    }
-
-  } else {
-    console.log(camera + ' is not recording, starting')
-    if (isPaused[camera]) {
-      isPaused[camera] = false;
-      updateToggleButtonUI(camera);
-    }
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ 
-        action: 'start_record',
-        filename: customName || undefined 
-      }));
-   
-      recordingState[camera] = true;
-      console.log('recording: ' + camera)
-
-      updateRecordButtonUI(camera);
-
-      showStatusMessage(`Recording started for ${camera}`, 1500);
-
-      // Optional auto-stop
-      setTimeout(() => {
-        if (recordingState[camera]) toggleRecording(camera);
-      }, maxRecordDuration || 30000);
-
-    } else {
-      showStatusMessage('Camera server not connected', 2000);
-      recordingState[camera] = false;
-      updateRecordButtonUI(camera);
-    }
-  }
-}
-function updateRecordButtonUI(camera) {
-  const btn = camera === 'front' ? recordFrontButton : recordBackButton;
-  if (!btn) return;
-
-  const span = btn.querySelector('span');
-  const icon = btn.querySelector('i');
-
-  if (recordingState[camera]) {
-    btn.classList.add('recording');
-    if (span) span.textContent = 'Stop Recording';
-    if (icon) icon.className = 'fa-solid fa-stop';
-  } else {
-    btn.classList.remove('recording');
-    if (span) span.textContent = 'Record Video';
-    if (icon) icon.className = 'fa-solid fa-video';
-  }
-}
 
 function updateToggleButtonUI(camera) {
   const toggleButton = camera === 'front' ? toggleFrontStreamButton : toggleBackStreamButton;

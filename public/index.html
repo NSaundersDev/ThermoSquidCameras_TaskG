@@ -32,11 +32,7 @@
     <div id="status-message" class="status-message"></div>
     <!-- Main Layout -->
     <main class="main-layout">
-      <!-- Grid Container -->
-      <!-- <div class="layout-grid">
-        
-        <!-- Camera Row -->
-        <div class="camera-row">
+      <div class="camera-row">
           <!-- Front Camera -->
           <section class="grid-item camera-section front-camera-section" data-camera="front">
             <div class="camera-panel front-camera">
@@ -49,10 +45,6 @@
                 <button id="capture-front-image" class="control-btn primary disabled" data-camera="front" data-action="capture" disabled aria-label="Capture front camera image">
                   <i class="fa-solid fa-camera"></i>
                   <span>Capture</span>
-                </button>
-                <button id="record-front-video" class="control-btn record disabled" data-camera="front" data-action="record" disabled aria-label="Record front camera video">
-                  <i class="fa-solid fa-video"></i>
-                  <span>Record</span>
                 </button>
               </div>
               <!-- UPDATED: camera-controls now only for pause/resume, centered below -->
@@ -208,10 +200,6 @@
                   <i class="fa-solid fa-camera"></i>
                   <span>Capture</span>
                 </button>
-                <button id="record-back-video" class="control-btn record disabled" data-camera="back" data-action="record" disabled aria-label="Record back camera video">
-                  <i class="fa-solid fa-video"></i>
-                  <span>Record</span>
-                </button>
               </div>
               <!-- UPDATED: camera-controls now only for pause/resume, centered below -->
               <div class="camera-controls">
@@ -352,7 +340,6 @@
             </div>
           </section>
         </div>
-      </div>
     </main>
     <div id="camera-modal" class="camera-modal-overlay" style="display: none;">
       <div class="camera-modal-content">
@@ -369,10 +356,6 @@
             <button id="modal-capture-btn" class="modal-capture-btn" aria-label="Capture from modal">
               <i class="fa-solid fa-camera"></i>
               <span>Capture</span>
-            </button>
-            <button id="modal-record-btn" class="modal-record-btn" aria-label="Record video in modal">
-              <i class="fa-solid fa-video"></i>
-              <span>Record</span>
             </button>
             <button id="modal-toggle-btn" class="modal-toggle-btn" aria-label="Pause or resume stream in modal">
               <i class="fa-solid fa-pause"></i>
