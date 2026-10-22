@@ -92,17 +92,23 @@ function captureFileName(door, customName, timestamp) {
   return `${timestamp}-${cleaned || door}.jpg`;
 }
 
-function sendSaveImage(door, imageData, customName) {
+function sendSaveImage(door, imageData, customName, fileName) {
   const timestamp = Date.now();
   const name = customName || '';
-  imageWs.send(JSON.stringify({
+  const payload = {
     action: 'save_image',
     door,
     image: imageData,
     timestamp,
     customName: name
-  }));
-  showCaptureConfirm(door, captureFileName(door, name, timestamp), true);
+  };
+  let shown = captureFileName(door, name, timestamp);
+  if (fileName) {
+    payload.fileName = fileName;
+    shown = `${fileName}.jpg`;
+  }
+  imageWs.send(JSON.stringify(payload));
+  showCaptureConfirm(door, shown, true);
 }
 
 function showCaptureConfirm(door, filename, ok, options) {
@@ -1167,7 +1173,7 @@ function openCameraModal(camera) {
  
   if (modal) {
     modal.style.display = 'flex';
-    document.getElementById('modal-camera-title').textContent = `${camera.charAt(0).toUpperCase() + camera.slice(1)} Camera`;
+    document.getElementById('modal-camera-title').textContent = cameraName(camera);
    
     // Set up modal timestamp checkbox (only if it exists)
     if (modalTimestampCheckbox) {
@@ -1908,6 +1914,252 @@ renderCameraSettings('front');
 renderCameraSettings('back');
 restoreCameraSettings('front');
 restoreCameraSettings('back');
+
+const CAMERA_NAMES_KEY = 'thermosquid.cameraNames';
+const DEFAULT_CAMERA_NAMES = { front: 'Front', back: 'Back' };
+const sessionState = {
+  active: false,
+  name: '',
+  expected: 0,
+  count: 0,
+  startedAt: 0,
+  timerId: null,
+  entries: [],
+  queue: [],
+  capturing: false
+};
+
+function fileToken(value, fallback) {
+  const cleaned = String(value || '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-zA-Z0-9-_]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  return cleaned || fallback;
+}
+
+function cameraName(door) {
+  const input = document.getElementById(`${door}-camera-name`);
+  const value = input?.value?.trim();
+  return value || DEFAULT_CAMERA_NAMES[door] || door;
+}
+
+function saveCameraNames() {
+  try {
+    localStorage.setItem(CAMERA_NAMES_KEY, JSON.stringify({
+      front: document.getElementById('front-camera-name').value.trim() || DEFAULT_CAMERA_NAMES.front,
+      back: document.getElementById('back-camera-name').value.trim() || DEFAULT_CAMERA_NAMES.back
+    }));
+  } catch (error) {
+    console.debug('Camera names were not stored');
+  }
+}
+
+function restoreCameraNames() {
+  let stored = {};
+  try {
+    stored = JSON.parse(localStorage.getItem(CAMERA_NAMES_KEY) || '{}') || {};
+  } catch (error) {
+    stored = {};
+  }
+  document.getElementById('front-camera-name').value = typeof stored.front === 'string' && stored.front.trim()
+    ? stored.front.trim()
+    : DEFAULT_CAMERA_NAMES.front;
+  document.getElementById('back-camera-name').value = typeof stored.back === 'string' && stored.back.trim()
+    ? stored.back.trim()
+    : DEFAULT_CAMERA_NAMES.back;
+}
+
+function formatElapsed(ms) {
+  const clamped = Math.max(0, ms);
+  const totalTenths = Math.floor(clamped / 100);
+  const tenths = totalTenths % 10;
+  const totalSeconds = Math.floor(totalTenths / 10);
+  const seconds = totalSeconds % 60;
+  const minutes = Math.floor(totalSeconds / 60);
+  return `${minutes}:${String(seconds).padStart(2, '0')}.${tenths}`;
+}
+
+function sessionImageBaseName(sessionName, cameraLabel, inputNumber, when) {
+  const date = when instanceof Date ? when : new Date();
+  const datePart = `${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}${String(date.getFullYear()).slice(-2)}`;
+  const count = String(inputNumber).padStart(2, '0');
+  let sessionToken = fileToken(sessionName, 'Session');
+  let cameraToken = fileToken(cameraLabel, 'Camera');
+  const room = 80 - datePart.length - count.length - 3;
+  if (sessionToken.length + cameraToken.length > room) {
+    sessionToken = sessionToken.slice(0, Math.max(1, room - 1));
+    cameraToken = cameraToken.slice(0, Math.max(1, room - sessionToken.length));
+  }
+  return `${datePart}-${sessionToken}-${cameraToken}-${count}`;
+}
+
+function readExpectedInputs() {
+  const raw = document.getElementById('session-input-count').value.trim();
+  if (!/^\d+$/.test(raw)) return null;
+  const value = Number(raw);
+  if (value < 1 || value > 99) return null;
+  return value;
+}
+
+function setSessionLocked(locked) {
+  document.getElementById('session-name').disabled = locked;
+  document.getElementById('session-input-count').disabled = locked;
+  document.getElementById('front-camera-name').disabled = locked;
+  document.getElementById('back-camera-name').disabled = locked;
+}
+
+function updateSessionControls() {
+  const active = sessionState.active;
+  const started = sessionState.startedAt > 0;
+  document.getElementById('session-bar').classList.toggle('is-running', active);
+  document.getElementById('session-start').hidden = active;
+  document.getElementById('session-stop').hidden = !active;
+  document.getElementById('session-input').hidden = !active;
+  document.getElementById('session-live').hidden = !started;
+  const nameOk = Boolean(fileToken(document.getElementById('session-name').value, ''));
+  document.getElementById('session-start').disabled = active || !nameOk || readExpectedInputs() == null;
+}
+
+function updateSessionProgress() {
+  document.getElementById('session-progress').textContent = `${sessionState.count} of ${sessionState.expected}`;
+}
+
+function renderSessionLog() {
+  const list = document.getElementById('session-log');
+  list.replaceChildren(...sessionState.entries.map((entry) => {
+    const item = document.createElement('li');
+    const count = document.createElement('span');
+    count.className = 'session-log-count';
+    count.textContent = String(entry.number).padStart(2, '0');
+    const time = document.createElement('span');
+    time.className = 'session-log-time';
+    time.textContent = formatElapsed(entry.elapsed);
+    item.dataset.wallClock = String(entry.at);
+    item.title = new Date(entry.at).toLocaleTimeString();
+    item.append(count, time);
+    return item;
+  }));
+}
+
+function stopSessionTimer() {
+  clearInterval(sessionState.timerId);
+  sessionState.timerId = null;
+}
+
+function startSessionTimer() {
+  stopSessionTimer();
+  const timer = document.getElementById('session-timer');
+  const tick = () => {
+    timer.textContent = formatElapsed(Date.now() - sessionState.startedAt);
+  };
+  tick();
+  sessionState.timerId = setInterval(tick, 100);
+}
+
+function endSession(elapsedMs) {
+  if (!sessionState.active) return;
+  sessionState.active = false;
+  sessionState.queue.length = 0;
+  stopSessionTimer();
+  const elapsed = elapsedMs == null ? Date.now() - sessionState.startedAt : elapsedMs;
+  document.getElementById('session-timer').textContent = formatElapsed(elapsed);
+  setSessionLocked(false);
+  updateSessionControls();
+}
+
+function startSession() {
+  const name = document.getElementById('session-name').value.trim();
+  const expected = readExpectedInputs();
+  if (!fileToken(name, '') || expected == null || sessionState.active) return;
+  sessionState.active = true;
+  sessionState.name = name;
+  sessionState.expected = expected;
+  sessionState.count = 0;
+  sessionState.startedAt = Date.now();
+  sessionState.entries = [];
+  sessionState.queue = [];
+  renderSessionLog();
+  updateSessionProgress();
+  setSessionLocked(true);
+  updateSessionControls();
+  document.getElementById('session-timer').textContent = '0:00.0';
+  startSessionTimer();
+}
+
+function recordSessionInput() {
+  if (!sessionState.active) return;
+  if (sessionState.count + sessionState.queue.length >= sessionState.expected) return;
+  sessionState.queue.push(Date.now());
+  drainSessionInputs();
+}
+
+async function captureSessionPair(inputNumber, when) {
+  await Promise.all(['front', 'back'].map(async (door) => {
+    const lastImage = lastCapturedImages[door];
+    const videoStream = door === 'front' ? frontVideoStream : backVideoStream;
+    const timestampCheckbox = door === 'front' ? frontTimestampCheckbox : backTimestampCheckbox;
+    const baseName = sessionImageBaseName(sessionState.name, cameraName(door), inputNumber, when);
+    if (!lastImage || !lastImage.image || lastImage.frames === 0 || !videoStream || !imageWs || imageWs.readyState !== WebSocket.OPEN) {
+      showCaptureConfirm(door, '', false);
+      return;
+    }
+    try {
+      const imageData = await getTimestampedImage(videoStream, door, lastImage.timestamp, timestampCheckbox);
+      sendSaveImage(door, imageData, '', baseName);
+    } catch (error) {
+      console.error('Session capture error:', error);
+      showCaptureConfirm(door, '', false);
+    }
+  }));
+}
+
+async function drainSessionInputs() {
+  if (sessionState.capturing) return;
+  sessionState.capturing = true;
+  try {
+    while (sessionState.active && sessionState.queue.length && sessionState.count < sessionState.expected) {
+      const at = sessionState.queue.shift();
+      const elapsed = at - sessionState.startedAt;
+      sessionState.count += 1;
+      const inputNumber = sessionState.count;
+      sessionState.entries.push({ number: inputNumber, elapsed, at });
+      renderSessionLog();
+      updateSessionProgress();
+      const finished = sessionState.count >= sessionState.expected;
+      if (finished) endSession(elapsed);
+      await captureSessionPair(inputNumber, new Date(at));
+    }
+  } finally {
+    sessionState.capturing = false;
+    if (sessionState.active && sessionState.queue.length) drainSessionInputs();
+  }
+}
+
+function initSessionUi() {
+  restoreCameraNames();
+  ['front', 'back'].forEach((door) => {
+    const input = document.getElementById(`${door}-camera-name`);
+    input.addEventListener('input', saveCameraNames);
+    input.addEventListener('change', () => {
+      if (!input.value.trim()) input.value = DEFAULT_CAMERA_NAMES[door];
+      saveCameraNames();
+      if (currentModalCamera === door) {
+        const title = document.getElementById('modal-camera-title');
+        if (title) title.textContent = cameraName(door);
+      }
+    });
+  });
+  document.getElementById('session-name').addEventListener('input', updateSessionControls);
+  document.getElementById('session-input-count').addEventListener('input', updateSessionControls);
+  document.getElementById('session-start').addEventListener('click', startSession);
+  document.getElementById('session-stop').addEventListener('click', () => endSession());
+  document.getElementById('session-input').addEventListener('click', recordSessionInput);
+  updateSessionControls();
+}
+
+initSessionUi();
 window.addEventListener('beforeunload', () => {
   navigator.sendBeacon?.('/api/camera/stop', '');
 });

@@ -137,10 +137,19 @@ wss.on('connection', (ws) => {
         }
         const date = new Date(timestamp).toISOString().split('T')[0];
         const dir = await ensureDir(door, date);
-        const safeCustomName = customName && customName.replace(/[^a-zA-Z0-9-_]/g, '') ? customName.replace(/[^a-zA-Z0-9-_]/g, '') : door;
-        const fileName = `${timestamp}-${safeCustomName}.jpg`;
-        const filename = path.join(dir, fileName);
-        console.log('Saving image:', { filename, customName, safeCustomName });
+        let storedName;
+        if (typeof data.fileName === 'string' && data.fileName !== '') {
+          if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$/.test(data.fileName)) {
+            ws.send(JSON.stringify({ status: 'error', action: 'save_image', door, message: 'Invalid file name' }));
+            return;
+          }
+          storedName = `${data.fileName}.jpg`;
+        } else {
+          const safeCustomName = customName && customName.replace(/[^a-zA-Z0-9-_]/g, '') ? customName.replace(/[^a-zA-Z0-9-_]/g, '') : door;
+          storedName = `${timestamp}-${safeCustomName}.jpg`;
+        }
+        const filename = path.join(dir, storedName);
+        console.log('Saving image:', { filename, customName, fileName: data.fileName || '' });
         try {
           if (typeof image === 'string' && image.startsWith('data:image/jpeg;base64,')) {
             const base64Data = image.replace(/^data:image\/jpeg;base64,/, '');
@@ -154,8 +163,8 @@ wss.on('connection', (ws) => {
           return;
         }
         console.log(`Saved image: ${filename}`);
-        const imagePath = `/images/${door}/${date}/${fileName}`;
-        ws.send(JSON.stringify({ status: 'saved', action: 'save_image', door, timestamp, path: imagePath, filename: fileName }));
+        const imagePath = `/images/${door}/${date}/${storedName}`;
+        ws.send(JSON.stringify({ status: 'saved', action: 'save_image', door, timestamp, path: imagePath, filename: storedName }));
         // Trigger gallery refresh
         const images = await listImages(door, date);
         wss.clients.forEach(client => {

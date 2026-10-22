@@ -116,10 +116,130 @@ body {
 .main-layout {
   flex: 1;
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+  width: 100%;
   margin: 0;
   min-height: 0;
+}
+.session-bar {
+  width: 100%;
+  margin: 0 0 0.6rem;
+  padding: 0.65rem 0.75rem;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 5px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+.session-bar.is-running {
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 2px rgba(0, 25, 116, 0.28);
+}
+.session-bar [hidden] {
+  display: none !important;
+}
+.session-setup,
+.session-actions,
+.session-live {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.7rem;
+}
+.session-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.session-field input {
+  margin: 0;
+  padding: 0.28rem 0.45rem;
+  border: 1px solid #adb5bd;
+  border-radius: 6px;
+  background: #fff;
+  color: #212529;
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+#session-name {
+  width: 12rem;
+  max-width: 100%;
+}
+.session-count-field input {
+  width: 4.2rem;
+}
+.session-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 20px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: #6c757d;
+  color: #fff;
+  border: 1px solid #545b62;
+  cursor: pointer;
+}
+.session-btn:disabled {
+  background: #e9ecef;
+  color: #6c757d;
+  border-color: #ced4da;
+  cursor: not-allowed;
+}
+.session-input-btn {
+  background: var(--button-primary);
+  border-color: #fff;
+}
+.session-live {
+  margin-top: 0.55rem;
+}
+.session-timer {
+  font-family: 'Roboto Mono', Consolas, monospace;
+  font-size: 2.6rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: var(--digital-red);
+  background: #1a1a1a;
+  padding: 0.35rem 0.75rem;
+  border-radius: 8px;
+  min-width: 7.4rem;
+  text-align: center;
+}
+.session-progress {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+.session-log {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.session-log:empty {
+  display: none;
+}
+.session-log li {
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: baseline;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #adb5bd;
+  font-family: 'Roboto Mono', Consolas, monospace;
+  font-size: 0.85rem;
+}
+.session-log-count {
+  font-weight: 700;
 }
 .layout-grid {
   display: grid;

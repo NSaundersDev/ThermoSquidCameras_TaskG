@@ -32,6 +32,39 @@
     <div id="status-message" class="status-message"></div>
     <!-- Main Layout -->
     <main class="main-layout">
+      <section id="session-bar" class="session-bar" aria-label="Capture session">
+        <div class="session-setup">
+          <label class="session-field" for="session-name">
+            Session
+            <input id="session-name" type="text" maxlength="40" placeholder="Name" autocomplete="off" aria-label="Session name">
+          </label>
+          <label class="session-field session-count-field" for="session-input-count">
+            Inputs
+            <input id="session-input-count" type="number" min="1" max="99" step="1" value="1" inputmode="numeric" aria-label="Number of inputs">
+          </label>
+          <button type="button" id="session-start" class="session-btn" disabled>
+            <i class="fa-solid fa-play" aria-hidden="true"></i>
+            <span>Start</span>
+          </button>
+        </div>
+        <div id="session-live" class="session-live" hidden>
+          <div id="session-timer" class="session-timer" role="timer">0:00.0</div>
+          <div class="session-live-side">
+            <div id="session-progress" class="session-progress">0 of 1</div>
+            <div class="session-actions">
+              <button type="button" id="session-input" class="session-btn session-input-btn" hidden>
+                <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                <span>Input</span>
+              </button>
+              <button type="button" id="session-stop" class="session-btn" hidden>
+                <i class="fa-solid fa-stop" aria-hidden="true"></i>
+                <span>Stop</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <ol id="session-log" class="session-log" aria-live="polite"></ol>
+      </section>
       <div class="camera-row">
           <!-- Front Camera -->
           <section class="grid-item camera-section front-camera-section" data-camera="front">
@@ -68,6 +101,10 @@
                   <label class="timestamp-toggle" for="front-timestamp">
                     <input id="front-timestamp" type="checkbox" checked aria-label="Add timestamp to front camera images">
                     Timestamp
+                  </label>
+                  <label class="filename-field" for="front-camera-name">
+                    Name
+                    <input id="front-camera-name" type="text" maxlength="40" value="Front" autocomplete="off" aria-label="Front camera name">
                   </label>
                   <label class="filename-field" for="custom-file-name-front">
                     File name
@@ -113,6 +150,10 @@
                   <label class="timestamp-toggle" for="back-timestamp">
                     <input id="back-timestamp" type="checkbox" checked aria-label="Add timestamp to back camera images">
                     Timestamp
+                  </label>
+                  <label class="filename-field" for="back-camera-name">
+                    Name
+                    <input id="back-camera-name" type="text" maxlength="40" value="Back" autocomplete="off" aria-label="Back camera name">
                   </label>
                   <label class="filename-field" for="custom-file-name-back">
                     File name
