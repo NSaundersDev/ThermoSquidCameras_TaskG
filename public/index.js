@@ -49,7 +49,7 @@ const closeModalBtn = document.getElementById('close-modal-btn');
 // Modal state
 let currentModalCamera = null;
 let modalIsPaused = false;
-let modalTimestampEnabled = true;
+let modalTimestampEnabled = false;
 // Temperature UI elements
 const temperatureElements = {
   container: null,
@@ -204,16 +204,6 @@ function drawTimestamp(imageElement, canvas, ctx, door, timestamp, timestampChec
   const timeText = dateObj.toLocaleTimeString();
   const dateText = dateObj.toLocaleDateString();
 
-  // Short camera label
-  const shortLabel = door === 'front' ? 'Cam1' : 'Cam2';
-
-  // === LEFT: Cam1 / Cam2 in GREEN ===
-  ctx.textAlign = 'left';
-  ctx.fillStyle = '#22c55e';      // Green color
-  ctx.strokeStyle = 'black';
-  ctx.strokeText(shortLabel, 10, 40);
-  ctx.fillText(shortLabel, 10, 40);
-
   // === RIGHT: Timestamp in WHITE ===
   ctx.textAlign = 'right';
   ctx.fillStyle = 'white';        // Back to white for timestamp
@@ -355,16 +345,6 @@ function addTimestampOverlay(ctx, door, timestamp) {
   const dateObj = new Date(timestamp);
   const timeText = dateObj.toLocaleTimeString();
   const dateText = dateObj.toLocaleDateString();
-
-  // Short label like the live feed
-  const shortLabel = door === 'front' ? 'Cam1' : 'Cam2';
-
-  // === LEFT: Cam1 / Cam2 (green) ===
-  ctx.textAlign = 'left';
-  ctx.fillStyle = '#22c55e';      // Green
-  ctx.strokeStyle = 'black';
-  ctx.strokeText(shortLabel, 10, 40);
-  ctx.fillText(shortLabel, 10, 40);
 
   // === RIGHT: Time + Date (white, right aligned) ===
   ctx.textAlign = 'right';
@@ -1169,17 +1149,19 @@ function requestNotificationPermission() {
 function openCameraModal(camera) {
   currentModalCamera = camera;
   modalIsPaused = false;
-  modalTimestampEnabled = true;
+  const sourceTimestamp = camera === 'front' ? frontTimestampCheckbox : backTimestampCheckbox;
+  modalTimestampEnabled = Boolean(sourceTimestamp?.checked);
  
   if (modal) {
     modal.style.display = 'flex';
     document.getElementById('modal-camera-title').textContent = cameraName(camera);
    
     // Set up modal timestamp checkbox (only if it exists)
-    if (modalTimestampCheckbox) {
-      modalTimestampCheckbox.checked = true;
+    const liveTimestamp = document.getElementById('modal-timestamp');
+    if (liveTimestamp) {
+      liveTimestamp.checked = modalTimestampEnabled;
       // Remove existing listeners to prevent duplicates
-      modalTimestampCheckbox.replaceWith(modalTimestampCheckbox.cloneNode(true));
+      liveTimestamp.replaceWith(liveTimestamp.cloneNode(true));
       const newCheckbox = document.getElementById('modal-timestamp');
       newCheckbox.addEventListener('change', (e) => {
         modalTimestampEnabled = e.target.checked;
