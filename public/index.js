@@ -31,12 +31,6 @@ const settingsFrontButton = document.getElementById('settings-front');
 const settingsBackButton = document.getElementById('settings-back');
 const frontSettingsMenu = document.getElementById('front-settings-menu');
 const backSettingsMenu = document.getElementById('back-settings-menu');
-const frontResolutionSelect = document.getElementById('front-resolution');
-const frontFramerateSelect = document.getElementById('front-framerate');
-const backResolutionSelect = document.getElementById('back-resolution');
-const backFramerateSelect = document.getElementById('back-framerate');
-const applyFrontSettings = document.getElementById('apply-front-settings');
-const applyBackSettings = document.getElementById('apply-back-settings');
 // Camera config
 const cameraConfig = {
   front: { resolution: '1536x864', framerate: 30 },
@@ -1373,65 +1367,50 @@ if (syncTimeBtn) {
 
       if (action === 'capture') {
         const lastImage = lastCapturedImages[camera];
-       
-        // Check if we have a valid image
+
+        if (button.dataset.busy === 'true') return;
+
         if (!lastImage || !lastImage.image || lastImage.frames === 0) {
           showStatusMessage(`Wait for ${camera} image...`, 1500);
           return;
         }
-       
-        // Show loading state
-        const originalText = button.querySelector('span').textContent;
-        button.querySelector('span').textContent = 'Saving...';
-        button.disabled = true;
-       
-        if (imageWs.readyState === WebSocket.OPEN) {
-          try {
-            const customName = (camera === 'front' ? customFileNameInputFront : customFileNameInputBack)?.value?.trim() || '';
-            const timestampCheckbox = camera === 'front' ? frontTimestampCheckbox : backTimestampCheckbox;
-            const videoStream = camera === 'front' ? frontVideoStream : backVideoStream;
-           
-            console.log('Starting capture process for', camera, 'timestamp enabled:', timestampCheckbox?.checked);
-           
-            // Get the image data (now returns a Promise)
-            getTimestampedImage(videoStream, camera, lastImage.timestamp, timestampCheckbox)
-              .then((imageData) => {
-                console.log('Got image data, sending to server, length:', imageData.length);
-               
-                imageWs.send(JSON.stringify({
-                  action: 'save_image',
-                  door: camera,
-                  image: imageData,
-                  timestamp: Date.now(),
-                  customName: customName
-                }));
-               
-                console.log('Image sent to server');
-               
-                // Reset button
-                setTimeout(() => {
-                  button.querySelector('span').textContent = originalText;
-                  button.disabled = false;
-                }, 300);
-               
-              })
-              .catch((error) => {
-                console.error('Failed to get image data:', error);
-                button.querySelector('span').textContent = originalText;
-                button.disabled = false;
-                showStatusMessage('Image processing failed', 2000);
-              });
-             
-          } catch (error) {
-            console.error('Capture setup error:', error);
-            button.querySelector('span').textContent = originalText;
-            button.disabled = false;
-            showStatusMessage('Capture failed', 2000);
-          }
-        } else {
-          button.querySelector('span').textContent = originalText;
-          button.disabled = false;
+
+        if (imageWs.readyState !== WebSocket.OPEN) {
           showStatusMessage('Image service busy', 1500);
+          return;
+        }
+
+        button.dataset.busy = 'true';
+        button.classList.add('is-capturing');
+
+        try {
+          const customName = (camera === 'front' ? customFileNameInputFront : customFileNameInputBack)?.value?.trim() || '';
+          const timestampCheckbox = camera === 'front' ? frontTimestampCheckbox : backTimestampCheckbox;
+          const videoStream = camera === 'front' ? frontVideoStream : backVideoStream;
+
+          getTimestampedImage(videoStream, camera, lastImage.timestamp, timestampCheckbox)
+            .then((imageData) => {
+              imageWs.send(JSON.stringify({
+                action: 'save_image',
+                door: camera,
+                image: imageData,
+                timestamp: Date.now(),
+                customName: customName
+              }));
+            })
+            .catch((error) => {
+              console.error('Failed to get image data:', error);
+              showStatusMessage('Image processing failed', 2000);
+            })
+            .finally(() => {
+              button.dataset.busy = 'false';
+              button.classList.remove('is-capturing');
+            });
+        } catch (error) {
+          console.error('Capture setup error:', error);
+          button.dataset.busy = 'false';
+          button.classList.remove('is-capturing');
+          showStatusMessage('Capture failed', 2000);
         }
       } else if (action === 'toggle') {
         isPaused[camera] = !isPaused[camera];
@@ -1442,10 +1421,6 @@ if (syncTimeBtn) {
       }
     });
   });
-  // Apply settings buttons
-  applyFrontSettings.addEventListener('click', () => applyCameraSettings('front'));
-  applyBackSettings.addEventListener('click', () => applyCameraSettings('back'));
-
   // Connect WebSockets
   setTimeout(() => {
     connectImageWebSocket();
@@ -1489,42 +1464,290 @@ function updateToggleButtonUI(camera) {
   }
 }
 
-// NEW: Toggle settings menu
-function toggleSettingsMenu(camera) {
-  const menu = camera === 'front' ? frontSettingsMenu : backSettingsMenu;
-  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+const CAMERA_SETTING_GROUPS = [
+  {
+    title: 'Picture',
+    fields: [
+      {
+        type: 'select', id: 'resolution', label: 'Resolution',
+        options: [
+          ['640x480', '640×480'],
+          ['1280x720', '1280×720'],
+          ['1920x1080', '1920×1080'],
+          ['1536x864', '1536×864', true]
+        ]
+      },
+      {
+        type: 'select', id: 'framerate', label: 'Framerate',
+        options: [
+          ['10', '10 fps'],
+          ['15', '15 fps'],
+          ['30', '30 fps', true],
+          ['60', '60 fps']
+        ]
+      }
+    ]
+  },
+  {
+    title: 'Image',
+    fields: [
+      { type: 'slider', id: 'brightness', label: 'Brightness', min: -1, max: 1, step: 0.05, value: 0 },
+      { type: 'slider', id: 'contrast', label: 'Contrast', min: 0, max: 32, step: 0.1, value: 1 },
+      { type: 'slider', id: 'sharpness', label: 'Sharpness', min: 0, max: 16, step: 0.1, value: 1 },
+      { type: 'slider', id: 'saturation', label: 'Saturation', min: 0, max: 32, step: 0.1, value: 1 },
+      { type: 'slider', id: 'ev', label: 'Exposure value', min: -10, max: 10, step: 1, value: 0 }
+    ]
+  },
+  {
+    title: 'Exposure',
+    fields: [
+      { type: 'slider', id: 'shutter', label: 'Shutter', hint: 'µs', min: 0, max: 100000, step: 1, value: 0, scale: 'log' },
+      { type: 'slider', id: 'gain', label: 'Gain', min: 0, max: 32, step: 0.1, value: 0 },
+      {
+        type: 'select', id: 'metering', label: 'Metering',
+        options: [
+          ['centre', 'Centre'],
+          ['spot', 'Spot'],
+          ['average', 'Average'],
+          ['custom', 'Custom']
+        ]
+      },
+      {
+        type: 'select', id: 'exposure', label: 'Exposure mode',
+        options: [
+          ['normal', 'Normal'],
+          ['sport', 'Sport'],
+          ['long', 'Long']
+        ]
+      }
+    ]
+  },
+  {
+    title: 'Color',
+    fields: [
+      {
+        type: 'select', id: 'awb', label: 'White balance',
+        options: [
+          ['auto', 'Auto'],
+          ['incandescent', 'Incandescent'],
+          ['tungsten', 'Tungsten'],
+          ['fluorescent', 'Fluorescent'],
+          ['indoor', 'Indoor'],
+          ['daylight', 'Daylight'],
+          ['cloudy', 'Cloudy'],
+          ['off', 'Manual']
+        ]
+      },
+      { type: 'slider', id: 'awb-red', label: 'Red gain', hint: 'Manual white balance', min: 0, max: 8, step: 0.1, value: 0, awbGain: true },
+      { type: 'slider', id: 'awb-blue', label: 'Blue gain', hint: 'Manual white balance', min: 0, max: 8, step: 0.1, value: 0, awbGain: true },
+      {
+        type: 'select', id: 'denoise', label: 'Denoise',
+        options: [
+          ['auto', 'Auto'],
+          ['off', 'Off'],
+          ['cdn_off', 'CDN Off'],
+          ['cdn_fast', 'CDN Fast'],
+          ['cdn_hq', 'CDN HQ']
+        ]
+      }
+    ]
+  }
+];
+
+function settingStepDecimals(step) {
+  const text = String(step);
+  const dot = text.indexOf('.');
+  return dot === -1 ? 0 : text.length - dot - 1;
 }
 
+function formatSettingValue(value, step) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '';
+  return number.toFixed(settingStepDecimals(step));
+}
+
+function clampSetting(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function logSliderPosition(field, value) {
+  if (value <= field.min) return 0;
+  const minPositive = Math.max(field.step, 1);
+  const clamped = clampSetting(value, minPositive, field.max);
+  const t = Math.log(clamped / minPositive) / Math.log(field.max / minPositive);
+  return String(Math.round(t * 1000));
+}
+
+function valueFromLogSlider(field, position) {
+  const pos = Number(position);
+  if (pos <= 0) return field.min;
+  const minPositive = Math.max(field.step, 1);
+  const t = pos / 1000;
+  const raw = minPositive * Math.pow(field.max / minPositive, t);
+  return clampSetting(Math.round(raw / field.step) * field.step, field.min, field.max);
+}
+
+function sliderPositionFor(field, value) {
+  if (field.scale === 'log') return logSliderPosition(field, value);
+  return formatSettingValue(value, field.step);
+}
+
+function valueFromSlider(field, position) {
+  if (field.scale === 'log') return valueFromLogSlider(field, position);
+  return clampSetting(Number(position), field.min, field.max);
+}
+
+function renderCameraSettings(camera) {
+  const menu = document.getElementById(`${camera}-settings-menu`);
+  if (!menu) return;
+
+  const groups = CAMERA_SETTING_GROUPS.map(group => {
+    const fields = group.fields.map(field => renderSettingField(camera, field)).join('');
+    return `<section class="settings-group"><h4>${group.title}</h4>${fields}</section>`;
+  }).join('');
+
+  menu.innerHTML = `
+    <p class="settings-note">Release a slider to apply it. Enter an exact value, or pick an option, and that applies too.</p>
+    <div class="settings-groups">${groups}</div>
+  `;
+
+  CAMERA_SETTING_GROUPS.forEach(group => {
+    group.fields.forEach(field => bindSettingField(camera, field));
+  });
+  updateAwbGainFields(camera);
+}
+
+function renderSettingField(camera, field) {
+  const inputId = `${camera}-${field.id}`;
+  const labelId = `${inputId}-label`;
+  const hint = field.hint ? `<span class="setting-hint">${field.hint}</span>` : '';
+  const awbClass = field.awbGain ? ' awb-gain' : '';
+
+  if (field.type === 'select') {
+    const options = field.options.map(([value, label, selected]) => {
+      return `<option value="${value}"${selected ? ' selected' : ''}>${label}</option>`;
+    }).join('');
+    return `
+      <div class="setting-field${awbClass}">
+        <div class="setting-field-head">
+          <label id="${labelId}" for="${inputId}">${field.label}</label>
+          ${hint}
+        </div>
+        <select id="${inputId}" aria-labelledby="${labelId}">${options}</select>
+      </div>
+    `;
+  }
+
+  const value = formatSettingValue(field.value, field.step);
+  const sliderValue = sliderPositionFor(field, field.value);
+  const sliderMax = field.scale === 'log' ? 1000 : field.max;
+  const sliderMin = field.scale === 'log' ? 0 : field.min;
+  const sliderStep = field.scale === 'log' ? 1 : field.step;
+  return `
+    <div class="setting-field${awbClass}">
+      <div class="setting-field-head">
+        <label id="${labelId}" for="${inputId}">${field.label}</label>
+        ${hint}
+      </div>
+      <div class="setting-slider-row">
+        <input type="range" id="${inputId}-slider" min="${sliderMin}" max="${sliderMax}" step="${sliderStep}" value="${sliderValue}" aria-labelledby="${labelId}">
+        <input type="number" id="${inputId}" min="${field.min}" max="${field.max}" step="${field.step}" value="${value}" inputmode="decimal" aria-label="${field.label} value">
+      </div>
+    </div>
+  `;
+}
+
+function bindSettingField(camera, field) {
+  const input = document.getElementById(`${camera}-${field.id}`);
+  if (!input) return;
+
+  if (field.type === 'select') {
+    input.addEventListener('change', () => {
+      if (field.id === 'awb') updateAwbGainFields(camera);
+      applyCameraSettings(camera);
+    });
+    return;
+  }
+
+  const slider = document.getElementById(`${camera}-${field.id}-slider`);
+  slider.addEventListener('input', () => {
+    input.value = formatSettingValue(valueFromSlider(field, slider.value), field.step);
+  });
+  slider.addEventListener('change', () => {
+    input.value = formatSettingValue(valueFromSlider(field, slider.value), field.step);
+    applyCameraSettings(camera);
+  });
+  input.addEventListener('change', () => {
+    const parsed = parseFloat(input.value);
+    const value = Number.isFinite(parsed)
+      ? clampSetting(parsed, field.min, field.max)
+      : valueFromSlider(field, slider.value);
+    input.value = formatSettingValue(value, field.step);
+    slider.value = sliderPositionFor(field, value);
+    applyCameraSettings(camera);
+  });
+}
+
+function updateAwbGainFields(camera) {
+  const manual = document.getElementById(`${camera}-awb`).value === 'off';
+  document.querySelectorAll(`#${camera}-settings-menu .awb-gain`).forEach(row => {
+    row.classList.toggle('is-disabled', !manual);
+    row.querySelectorAll('input').forEach(input => {
+      input.disabled = !manual;
+    });
+  });
+}
+
+function toggleSettingsMenu(camera) {
+  const menu = camera === 'front' ? frontSettingsMenu : backSettingsMenu;
+  if (!menu) return;
+  menu.classList.toggle('is-open');
+}
+
+const lastSentCameraSettings = { front: '', back: '' };
+
+function readSettingNumber(id, fallback) {
+  const parsed = parseFloat(document.getElementById(id).value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+renderCameraSettings('front');
+renderCameraSettings('back');
+
 function applyCameraSettings(camera) {
-  const resolutionSelect = camera === 'front' ? frontResolutionSelect : backResolutionSelect;
-  const framerateSelect = camera === 'front' ? frontFramerateSelect : backFramerateSelect;
+  const resolutionSelect = document.getElementById(`${camera}-resolution`);
+  const framerateSelect = document.getElementById(`${camera}-framerate`);
   const [width, height] = resolutionSelect.value.split('x');
 
   const settings = {
     action: 'set_config',
-    width: parseInt(width),
-    height: parseInt(height),
-    framerate: parseInt(framerateSelect.value),
-    brightness: parseFloat(document.getElementById(`${camera}-brightness`).value) || 0,
-    contrast: parseFloat(document.getElementById(`${camera}-contrast`).value) || 1,
-    sharpness: parseFloat(document.getElementById(`${camera}-sharpness`).value) || 1,
-    saturation: parseFloat(document.getElementById(`${camera}-saturation`).value) || 1,
-    ev: parseInt(document.getElementById(`${camera}-ev`).value) || 0,
-    shutter: parseInt(document.getElementById(`${camera}-shutter`).value) || 0,
-    gain: parseFloat(document.getElementById(`${camera}-gain`).value) || 0,
+    width: parseInt(width, 10),
+    height: parseInt(height, 10),
+    framerate: parseInt(framerateSelect.value, 10),
+    brightness: readSettingNumber(`${camera}-brightness`, 0),
+    contrast: readSettingNumber(`${camera}-contrast`, 1),
+    sharpness: readSettingNumber(`${camera}-sharpness`, 1),
+    saturation: readSettingNumber(`${camera}-saturation`, 1),
+    ev: readSettingNumber(`${camera}-ev`, 0),
+    shutter: Math.round(readSettingNumber(`${camera}-shutter`, 0)),
+    gain: readSettingNumber(`${camera}-gain`, 0),
     metering: document.getElementById(`${camera}-metering`).value || 'centre',
     exposure: document.getElementById(`${camera}-exposure`).value || 'normal',
     awb: document.getElementById(`${camera}-awb`).value || 'auto',
-    awb_red: parseFloat(document.getElementById(`${camera}-awb-red`).value) || 0,
-    awb_blue: parseFloat(document.getElementById(`${camera}-awb-blue`).value) || 0,
+    awb_red: readSettingNumber(`${camera}-awb-red`, 0),
+    awb_blue: readSettingNumber(`${camera}-awb-blue`, 0),
     denoise: document.getElementById(`${camera}-denoise`).value || 'auto'
   };
+
+  const payload = JSON.stringify(settings);
+  if (lastSentCameraSettings[camera] === payload) return;
+  lastSentCameraSettings[camera] = payload;
 
   const cameraWs = camera === 'front' ? frontCameraWs : backCameraWs;
 
   if (cameraWs && cameraWs.readyState === WebSocket.OPEN) {
-    cameraWs.send(JSON.stringify(settings));
-    showStatusMessage(`${camera} settings applied`, 2000);
+    cameraWs.send(payload);
+    showStatusMessage(`${camera} settings applied`, 1000);
     console.log(`Sent settings for ${camera}:`, settings);
   } else {
     showStatusMessage(`${camera} camera not connected`, 2000);

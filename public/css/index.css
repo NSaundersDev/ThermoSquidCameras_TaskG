@@ -635,7 +635,7 @@ width: 100%;
   gap: 0.5rem;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   height: 100%;
-  transition: transform 0.2s ease;
+  transition: box-shadow 0.2s ease;
   position: relative;
   overflow: hidden;
   color: var(--text-primary);
@@ -651,7 +651,6 @@ width: 100%;
   background: var(--control-bar);
 }
 .camera-panel:hover {
-  transform: translateY(-1px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 .camera-header {
@@ -751,18 +750,19 @@ width: 100%;
   gap: 0.5rem; /* Adjusted for settings button */
   position: relative; /* For any future absolute positioning */
 }
-/* NEW: Overlaid Capture Button */
+/* Overlaid capture button. Do not scale or use transition:all here:
+   transforming an icon font makes the camera glyph flash a box with an X. */
 .control-btn.primary {
   position: absolute;
   bottom: 0.5rem;
-  /* Base: overridden by camera-specific rules below */
   left: 50%;
   transform: translateX(-50%);
   z-index: 2;
+  display: inline-flex;
   background: var(--button-primary);
   color: var(--text-secondary);
   border: 1px solid var(--button-border);
-  border-radius: 50%; /* Circular for thumb-friendliness */
+  border-radius: 50%;
   width: 60px;
   height: 60px;
   padding: 0;
@@ -771,25 +771,36 @@ width: 100%;
   justify-content: center;
   align-items: center;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  transition: all 0.3s ease;
+  transition: box-shadow 0.15s ease, opacity 0.15s ease;
   opacity: 0.9;
-  /* Hide span for icon-only look */
-  overflow: hidden;
+  cursor: pointer;
+  overflow: visible;
 }
 .control-btn.primary span {
-  display: none; /* Icon-only for overlay */
+  display: none;
 }
 .control-btn.primary:hover:not(:disabled) {
-  transform: translateX(-50%) scale(1.1); /* Keep scale, but base transform may vary */
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
   opacity: 1;
 }
-.control-btn.primary i {
-  font-size: 1.4rem; /* Larger icon for quick taps */
+.control-btn.primary i,
+.control-btn.primary i::before {
+  font-size: 1.4rem;
+  line-height: 1;
+  pointer-events: none;
+  transition: none;
 }
-.control-btn.primary:disabled {
-  opacity: 0.5;
-  transform: translateX(-50%) scale(1);
+.control-btn.primary:disabled,
+.control-btn.primary.disabled {
+  opacity: 0.55;
+  cursor: default !important;
+  background: var(--button-primary) !important;
+  color: var(--text-secondary) !important;
+  transform: translateX(-50%);
+}
+.control-btn.primary.is-capturing {
+  opacity: 0.75;
+  cursor: progress;
 }
 /* UPDATED: Tighter Offset for ~15px effective gap - Front to right, Back to left */
 .front-camera-section .control-btn.primary {
@@ -803,8 +814,12 @@ width: 100%;
   transform: none; /* No translate for edge positioning */
 }
 .front-camera-section .control-btn.primary:hover:not(:disabled),
-.back-camera-section .control-btn.primary:hover:not(:disabled) {
-  transform: scale(1.1); /* Scale without translate on hover */
+.back-camera-section .control-btn.primary:hover:not(:disabled),
+.front-camera-section .control-btn.primary:disabled,
+.back-camera-section .control-btn.primary:disabled,
+.front-camera-section .control-btn.primary.disabled,
+.back-camera-section .control-btn.primary.disabled {
+  transform: none;
 }
 /* Pause/Resume: Centered below feed */
 .control-btn.secondary {
@@ -1620,8 +1635,12 @@ width: 100%;
   color: white;
 }
 .modal-capture-btn:hover {
-  transform: translateY(-2px);
   box-shadow: 0 5px 15px rgba(0, 106, 235, 0.4);
+}
+.modal-capture-btn i,
+.modal-capture-btn i::before {
+  transition: none;
+  pointer-events: none;
 }
 .modal-toggle-btn:hover {
   background: #5a6268;
@@ -1718,159 +1737,114 @@ width: 100%;
     width: 100%;
   }
 }
-/* New camera settings menu styles */
 .camera-settings-menu {
+  display: none;
+  margin-top: 0.5rem;
+  padding: 0.75rem;
   background: #f8f9fa;
   border: 1px solid #dee2e6;
-  border-radius: 4px;
-  padding: 0.5rem;
-  margin-top: 0.25rem;
-  display: none;
-  flex-direction: column;
-  gap: 0.25rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
-.camera-settings-menu label {
+.camera-settings-menu.is-open {
+  display: block;
+}
+.settings-note {
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: #495057;
+}
+.settings-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 0.75rem;
+}
+.settings-group {
+  min-width: 0;
+  padding: 0.7rem 0.75rem 0.15rem;
+  background: #fff;
+  border: 1px solid #e3e6ea;
+  border-radius: 8px;
+}
+.settings-group h4 {
+  margin: 0 0 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5c6770;
+}
+.setting-field {
+  margin-bottom: 0.7rem;
+  min-width: 0;
+}
+.setting-field-head {
   display: flex;
-  flex-direction: column;
-  font-size: 0.7rem;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+.setting-field-head label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #212529;
+}
+.setting-hint {
+  font-size: 0.72rem;
+  color: #6c757d;
+  white-space: nowrap;
+}
+.setting-slider-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 5.6rem;
+  gap: 0.55rem;
+  align-items: center;
+}
+.camera-settings-menu input[type="range"] {
+  width: 100%;
+  min-width: 0;
+  height: 1.6rem;
+  margin: 0;
+  accent-color: #0d6efd;
+  cursor: pointer;
+  background: transparent;
+}
+.camera-settings-menu input[type="number"],
+.camera-settings-menu select {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid #adb5bd;
+  border-radius: 6px;
+  background: #fff;
+  color: #212529;
+  font-size: 0.85rem;
+}
+.camera-settings-menu input[type="number"] {
+  font-family: 'Roboto Mono', ui-monospace, monospace;
 }
 .camera-settings-menu select {
-  padding: 0.25rem;
-  border: 1px solid #adb5bd;
-  border-radius: 4px;
-}
-.camera-settings-menu button {
-  padding: 0.25rem;
-  background: var(--button-primary);
-  color: white;
-  border: none;
-  border-radius: 4px;
+  font-family: 'Segoe UI', 'Roboto', sans-serif;
   cursor: pointer;
 }
-.camera-settings-menu button:hover {
-  opacity: 0.9;
-}
-
-/* === ENABLE ALL NUMBER INPUTS IN SETTINGS MENU === */
-.camera-settings-menu input[type="number"],
-.camera-settings-menu select,
-.camera-settings-menu button {
-  width: 100%;
-  padding: 0.4rem 0.5rem;
-  margin-top: 0.25rem;
-  border: 1px solid #999;
-  border-radius: 4px;
-  background-color: #ffffff !important;
-  color: #000000 !important;
-  font-size: 0.9rem;
-  cursor: text;
-  appearance: auto;
-  -moz-appearance: textfield;
-}
-
 .camera-settings-menu input[type="number"]:focus,
-.camera-settings-menu select:focus {
-  outline: 2px solid #006aeb;
-  border-color: #006aeb;
-}
-
-.camera-settings-menu button {
-  margin-top: 0.75rem;
-  background: #006aeb;
-  color: white;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-.camera-settings-menu button:hover {
-  background: #0052a9;
-}
-
-/* Remove spinner arrows from number inputs (clean look) */
-.camera-settings-menu input[type="number"]::-webkit-inner-spin-button,
-.camera-settings-menu input[type="number"]::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-/* ——— 2-COLUMN CAMERA SETTINGS MENU ——— */
-.camera-settings-menu {
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
-  border-radius: 8px;
-  padding: 1rem;
-  margin-top: 0.5rem;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-
-.settings-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem 1.5rem;
-  margin-bottom: 1rem;
-}
-
-.settings-column label {
-  display: flex;
-  flex-direction: column;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 0.75rem;
-}
-
-.settings-column input[type="number"],
-.settings-column select {
-  margin-top: 0.35rem;
-  padding: 0.5rem;
-  border: 1px solid #aaa;
-  border-radius: 6px;
-  background: white;
-  font-size: 0.95rem;
-  transition: all 0.2s;
-}
-
-.settings-column input[type="number"]:focus,
-.settings-column select:focus {
+.camera-settings-menu select:focus,
+.camera-settings-menu input[type="range"]:focus {
   outline: none;
-  border-color: #006aeb;
-  box-shadow: 0 0 0 3px rgba(0,106,235,0.2);
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2);
 }
-
-/* ——— GORGEOUS APPLY BUTTON ——— */
-.apply-settings-btn {
-  width: 100%;
-  padding: 0.9rem;
-  background: linear-gradient(135deg, #006aeb, #002e74);
-  color: white;
-  font-size: 1.1rem;
-  font-weight: bold;
-  letter-spacing: 0.5px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(0,106,235,0.4);
-  text-transform: uppercase;
+.setting-field.is-disabled {
+  opacity: 0.45;
 }
-
-.apply-settings-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0,106,235,0.5);
-  background: linear-gradient(135deg, #0052a9, #001974);
-}
-
-.apply-settings-btn:active {
-  transform: translateY(0);
-}
-
-/* Mobile fallback — stack columns */
-@media (max-width: 900px) {
-  .settings-grid {
-    grid-template-columns: 1fr;
+@media (max-width: 520px) {
+  .setting-slider-row {
+    grid-template-columns: minmax(0, 1fr) 4.8rem;
   }
 }
-
 .time-sync-overlay {
   position: fixed;
   top: 0;
@@ -1977,77 +1951,6 @@ width: 100%;
   object-fit: contain;       /* or 'cover' if you prefer full bleed */
   display: block;
 }
-
-/* Settings menu can be tall without affecting the row height */
-.camera-settings-menu {
-  margin-top: 0.5rem;
-}
-
-.camera-settings-menu label {
-  display: grid !important;
-  grid-template-columns: 1fr 135px;   /* label takes space, control fixed at 135px */
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.4rem;
-  font-size: 0.9rem;
-}
-
-.camera-settings-menu label select,
-.camera-settings-menu label input[type="number"] {
-  width: 100%;
-  max-width: 135px;
-  padding: 4px 8px;
-  font-size: 0.85rem;
-  border: 1px solid #555;
-  border-radius: 4px;
-  background: #1f1f1f;
-  color: #eee;
-}
-
-/* Make the two columns sit closer together */
-.settings-grid {
-  gap: 0.75rem 1rem;
-}
-
-/* ======================================================
-   APPLY SETTINGS BUTTON — Modern look
-   ====================================================== */
-.apply-settings-btn {
-  width: 100%;
-  background: linear-gradient(135deg, #0d6efd, #0a58ca);
-  color: #fff;
-  border: none;
-  padding: 11px 18px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 3px 10px rgba(13, 110, 253, 0.35);
-  margin-top: 0.6rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.apply-settings-btn:hover {
-  background: linear-gradient(135deg, #0a58ca, #084298);
-  transform: translateY(-1px);
-  box-shadow: 0 5px 14px rgba(13, 110, 253, 0.45);
-}
-
-.apply-settings-btn:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 6px rgba(13, 110, 253, 0.3);
-}
-
-/* Optional icon inside button (recommended) */
-.apply-settings-btn i {
-  font-size: 1rem;
-}
-
 
 /* Remove hover zoom/scale on video feeds */
 .video-wrapper:hover,
