@@ -1926,7 +1926,12 @@ const sessionState = {
   timerId: null,
   entries: [],
   queue: [],
-  capturing: false
+  delayMs: 0,
+  intervalMs: 0,
+  imageCount: 1,
+  shotsCancelled: false,
+  shotTimers: new Set(),
+  captureChain: Promise.resolve()
 };
 
 function fileToken(value, fallback) {
@@ -1981,18 +1986,31 @@ function formatElapsed(ms) {
   return `${minutes}:${String(seconds).padStart(2, '0')}.${tenths}`;
 }
 
-function sessionImageBaseName(sessionName, cameraLabel, inputNumber, when) {
+function sessionImageBaseName(sessionName, cameraLabel, inputNumber, when, shotIndex, total) {
   const date = when instanceof Date ? when : new Date();
   const datePart = `${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}${String(date.getFullYear()).slice(-2)}`;
   const count = String(inputNumber).padStart(2, '0');
+  const shot = total > 1 ? `-${String(shotIndex).padStart(2, '0')}` : '';
   let sessionToken = fileToken(sessionName, 'Session');
   let cameraToken = fileToken(cameraLabel, 'Camera');
-  const room = 80 - datePart.length - count.length - 3;
+  const room = 80 - datePart.length - count.length - shot.length - 3;
   if (sessionToken.length + cameraToken.length > room) {
     sessionToken = sessionToken.slice(0, Math.max(1, room - 1));
     cameraToken = cameraToken.slice(0, Math.max(1, room - sessionToken.length));
   }
-  return `${datePart}-${sessionToken}-${cameraToken}-${count}`;
+  return `${datePart}-${sessionToken}-${cameraToken}-${count}${shot}`;
+}
+
+function readSecondsField(id) {
+  const value = document.getElementById(id).valueAsNumber;
+  if (!Number.isFinite(value) || value < 0 || value > 3600) return null;
+  return Math.round(value * 1000);
+}
+
+function readImageCount() {
+  const value = document.getElementById('session-image-count').valueAsNumber;
+  if (!Number.isInteger(value) || value < 1 || value > 20) return null;
+  return value;
 }
 
 function readExpectedInputs() {
@@ -2006,6 +2024,9 @@ function readExpectedInputs() {
 function setSessionLocked(locked) {
   document.getElementById('session-name').disabled = locked;
   document.getElementById('session-input-count').disabled = locked;
+  document.getElementById('session-delay').disabled = locked;
+  document.getElementById('session-image-count').disabled = locked;
+  document.getElementById('session-interval').disabled = locked;
   document.getElementById('front-camera-name').disabled = locked;
   document.getElementById('back-camera-name').disabled = locked;
 }
@@ -2021,6 +2042,9 @@ function updateSessionControls() {
   const icon = start.querySelector('i');
   const label = start.querySelector('span');
   const nameOk = Boolean(fileToken(document.getElementById('session-name').value, ''));
+  const timingOk = readSecondsField('session-delay') != null
+    && readSecondsField('session-interval') != null
+    && readImageCount() != null;
   if (active) {
     start.disabled = false;
     start.classList.add('is-stop');
@@ -2032,7 +2056,7 @@ function updateSessionControls() {
     if (icon) icon.className = 'fa-solid fa-play';
     if (label) label.textContent = 'Start';
     start.setAttribute('aria-label', 'Start session');
-    start.disabled = !nameOk || readExpectedInputs() == null;
+    start.disabled = !nameOk || readExpectedInputs() == null || !timingOk;
   }
 }
 
@@ -2072,10 +2096,17 @@ function startSessionTimer() {
   sessionState.timerId = setInterval(tick, 100);
 }
 
-function endSession(elapsedMs) {
+function cancelPendingShots() {
+  sessionState.shotsCancelled = true;
+  sessionState.shotTimers.forEach((timer) => clearTimeout(timer));
+  sessionState.shotTimers.clear();
+}
+
+function endSession(elapsedMs, cancelShots) {
   if (!sessionState.active) return;
   sessionState.active = false;
   sessionState.queue.length = 0;
+  if (cancelShots) cancelPendingShots();
   stopSessionTimer();
   const elapsed = elapsedMs == null ? Date.now() - sessionState.startedAt : elapsedMs;
   document.getElementById('session-timer').textContent = formatElapsed(elapsed);
@@ -2086,10 +2117,17 @@ function endSession(elapsedMs) {
 function startSession() {
   const name = document.getElementById('session-name').value.trim();
   const expected = readExpectedInputs();
-  if (!fileToken(name, '') || expected == null || sessionState.active) return;
+  const delayMs = readSecondsField('session-delay');
+  const intervalMs = readSecondsField('session-interval');
+  const imageCount = readImageCount();
+  if (!fileToken(name, '') || expected == null || delayMs == null || intervalMs == null || imageCount == null || sessionState.active) return;
   sessionState.active = true;
+  sessionState.shotsCancelled = false;
   sessionState.name = name;
   sessionState.expected = expected;
+  sessionState.delayMs = delayMs;
+  sessionState.intervalMs = intervalMs;
+  sessionState.imageCount = imageCount;
   sessionState.count = 0;
   sessionState.startedAt = Date.now();
   sessionState.entries = [];
@@ -2100,6 +2138,15 @@ function startSession() {
   updateSessionControls();
   document.getElementById('session-timer').textContent = '0:00.0';
   startSessionTimer();
+  const names = { front: cameraName('front'), back: cameraName('back') };
+  runCapture({
+    inputNumber: 0,
+    shotIndex: 1,
+    total: 1,
+    when: new Date(sessionState.startedAt),
+    sessionName: name,
+    names
+  });
 }
 
 function recordSessionInput() {
@@ -2109,12 +2156,12 @@ function recordSessionInput() {
   drainSessionInputs();
 }
 
-async function captureSessionPair(inputNumber, when) {
+async function captureSessionPair(job) {
   await Promise.all(['front', 'back'].map(async (door) => {
     const lastImage = lastCapturedImages[door];
     const videoStream = door === 'front' ? frontVideoStream : backVideoStream;
     const timestampCheckbox = door === 'front' ? frontTimestampCheckbox : backTimestampCheckbox;
-    const baseName = sessionImageBaseName(sessionState.name, cameraName(door), inputNumber, when);
+    const baseName = sessionImageBaseName(job.sessionName, job.names[door], job.inputNumber, job.when, job.shotIndex, job.total);
     if (!lastImage || !lastImage.image || lastImage.frames === 0 || !videoStream || !imageWs || imageWs.readyState !== WebSocket.OPEN) {
       showCaptureConfirm(door, '', false);
       return;
@@ -2129,25 +2176,49 @@ async function captureSessionPair(inputNumber, when) {
   }));
 }
 
-async function drainSessionInputs() {
-  if (sessionState.capturing) return;
-  sessionState.capturing = true;
-  try {
-    while (sessionState.active && sessionState.queue.length && sessionState.count < sessionState.expected) {
-      const at = sessionState.queue.shift();
-      const elapsed = at - sessionState.startedAt;
-      sessionState.count += 1;
-      const inputNumber = sessionState.count;
-      sessionState.entries.push({ number: inputNumber, elapsed, at });
-      renderSessionLog();
-      updateSessionProgress();
-      const finished = sessionState.count >= sessionState.expected;
-      if (finished) endSession(elapsed);
-      await captureSessionPair(inputNumber, new Date(at));
-    }
-  } finally {
-    sessionState.capturing = false;
-    if (sessionState.active && sessionState.queue.length) drainSessionInputs();
+function runCapture(job) {
+  sessionState.captureChain = sessionState.captureChain.then(() => captureSessionPair(job)).catch((error) => {
+    console.error('Session capture error:', error);
+  });
+}
+
+function scheduleShot(job) {
+  const wait = Math.max(0, job.dueAt - Date.now());
+  const timer = setTimeout(() => {
+    sessionState.shotTimers.delete(timer);
+    if (sessionState.shotsCancelled) return;
+    runCapture(job);
+  }, wait);
+  sessionState.shotTimers.add(timer);
+}
+
+function scheduleBurst(inputNumber, detectedAt) {
+  const names = { front: cameraName('front'), back: cameraName('back') };
+  const total = sessionState.imageCount;
+  for (let shot = 1; shot <= total; shot++) {
+    scheduleShot({
+      inputNumber,
+      shotIndex: shot,
+      total,
+      dueAt: detectedAt + sessionState.delayMs + (shot - 1) * sessionState.intervalMs,
+      when: new Date(detectedAt),
+      sessionName: sessionState.name,
+      names
+    });
+  }
+}
+
+function drainSessionInputs() {
+  while (sessionState.active && sessionState.queue.length && sessionState.count < sessionState.expected) {
+    const at = sessionState.queue.shift();
+    const elapsed = at - sessionState.startedAt;
+    sessionState.count += 1;
+    const inputNumber = sessionState.count;
+    sessionState.entries.push({ number: inputNumber, elapsed, at });
+    renderSessionLog();
+    updateSessionProgress();
+    scheduleBurst(inputNumber, at);
+    if (sessionState.count >= sessionState.expected) endSession(elapsed, false);
   }
 }
 
@@ -2165,10 +2236,11 @@ function initSessionUi() {
       }
     });
   });
-  document.getElementById('session-name').addEventListener('input', updateSessionControls);
-  document.getElementById('session-input-count').addEventListener('input', updateSessionControls);
+  ['session-name', 'session-input-count', 'session-delay', 'session-image-count', 'session-interval'].forEach((id) => {
+    document.getElementById(id).addEventListener('input', updateSessionControls);
+  });
   document.getElementById('session-start').addEventListener('click', () => {
-    if (sessionState.active) endSession();
+    if (sessionState.active) endSession(undefined, true);
     else startSession();
   });
   document.getElementById('session-input').addEventListener('click', recordSessionInput);
