@@ -86,12 +86,6 @@ function showStatus(message, duration = 3000, isError = false) {
   }, duration);
 }
 
-function getDoorLabel(door) {
-  if (door === 'front') return 'Cam1';
-  if (door === 'back') return 'Cam2';
-  return door;
-}
-
 function downloadFile(filePath) {
   const a = document.createElement('a');
   a.href = filePath;
@@ -297,22 +291,11 @@ function galleryEntries(images) {
 function renderImageCard(img) {
   const card = document.createElement('div');
   card.className = 'image-card';
-  const label = getDoorLabel(img.door);
-  let badgeColor = '#555';
-  if (img.door === 'front') badgeColor = '#0d6efd';
-  if (img.door === 'back') badgeColor = '#198754';
   const fileName = imageFileName(img);
   card.innerHTML = `
     <img src="${escapeHtml(img.path)}" alt="${escapeHtml(fileName)}" loading="lazy">
     <p class="file-name">${fileNameHtml(fileName)}</p>
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; gap: 8px;">
-      <p style="margin: 0; font-size: 0.85rem; color: #ccc; white-space: nowrap;">
-        ${new Date(img.timestamp).toLocaleString()}
-      </p>
-      <span style="font-size: 0.7rem; background: ${badgeColor}; color: white; padding: 2px 8px; border-radius: 4px; white-space: nowrap;">
-        ${escapeHtml(label)}
-      </span>
-    </div>
+    <p class="image-time">${new Date(img.timestamp).toLocaleString()}</p>
     <button class="view-btn" type="button">View</button>
     <button class="download" type="button">Download</button>
   `;
@@ -325,13 +308,11 @@ function renderImageCard(img) {
 
 function renderSessionCard(group) {
   const preview = [...group.images].sort(compareSessionImages)[0];
-  const fileName = imageFileName(preview);
   const link = document.createElement('a');
   link.className = 'image-card session-card';
   link.href = `media_gallery.html?session=${encodeURIComponent(group.key)}`;
   link.innerHTML = `
-    <img src="${escapeHtml(preview.path)}" alt="${escapeHtml(fileName)}" loading="lazy">
-    <p class="file-name">${fileNameHtml(fileName)}</p>
+    <img src="${escapeHtml(preview.path)}" alt="${escapeHtml(group.session)}" loading="lazy">
     <p class="session-title">${escapeHtml(group.session)}</p>
     <p class="session-meta">${escapeHtml(formatSessionDate(group.date))} · ${group.images.length} images</p>
   `;

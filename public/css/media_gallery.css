@@ -89,9 +89,16 @@ a.session-card {
   text-decoration: none;
 }
 .session-title {
-  margin: 0.45rem 0 0.15rem;
-  font-size: 1rem;
+  margin: 0.55rem 0 0.2rem;
+  font-size: 1.15rem;
   font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+}
+.image-time {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: #ccc;
 }
 [hidden] {
   display: none !important;
