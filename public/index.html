@@ -49,21 +49,21 @@
         </div>
         <div id="session-live" class="session-live" hidden>
           <div id="session-timer" class="session-timer" role="timer">0:00.0</div>
-          <div class="session-live-side">
-            <div id="session-progress" class="session-progress">0 of 1</div>
-            <div class="session-actions">
-              <button type="button" id="session-input" class="session-btn session-input-btn" hidden>
-                <i class="fa-solid fa-bolt" aria-hidden="true"></i>
-                <span>Input</span>
-              </button>
-              <button type="button" id="session-stop" class="session-btn" hidden>
-                <i class="fa-solid fa-stop" aria-hidden="true"></i>
-                <span>Stop</span>
-              </button>
-            </div>
-          </div>
         </div>
         <ol id="session-log" class="session-log" aria-live="polite"></ol>
+        <div id="session-side" class="session-side" hidden>
+          <div id="session-progress" class="session-progress">0 of 1</div>
+          <div class="session-actions">
+            <button type="button" id="session-input" class="session-btn session-input-btn" hidden>
+              <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+              <span>Input</span>
+            </button>
+            <button type="button" id="session-stop" class="session-btn" hidden>
+              <i class="fa-solid fa-stop" aria-hidden="true"></i>
+              <span>Stop</span>
+            </button>
+          </div>
+        </div>
       </section>
       <div class="camera-row">
           <!-- Front Camera -->

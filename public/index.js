@@ -2018,6 +2018,7 @@ function updateSessionControls() {
   document.getElementById('session-stop').hidden = !active;
   document.getElementById('session-input').hidden = !active;
   document.getElementById('session-live').hidden = !started;
+  document.getElementById('session-side').hidden = !started;
   const nameOk = Boolean(fileToken(document.getElementById('session-name').value, ''));
   document.getElementById('session-start').disabled = active || !nameOk || readExpectedInputs() == null;
 }
