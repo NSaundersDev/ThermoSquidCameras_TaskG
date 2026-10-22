@@ -42,6 +42,10 @@
             Inputs
             <input id="session-input-count" type="number" min="1" max="99" step="1" value="1" inputmode="numeric" aria-label="Number of inputs">
           </label>
+          <button type="button" id="session-start" class="session-btn" disabled>
+            <i class="fa-solid fa-play" aria-hidden="true"></i>
+            <span>Start</span>
+          </button>
           <label class="session-field session-count-field" for="session-delay">
             Delay s
             <input id="session-delay" type="number" min="0" max="3600" step="0.1" value="0" inputmode="decimal" aria-label="Seconds to wait after an input before the first image">
@@ -54,10 +58,6 @@
             Interval s
             <input id="session-interval" type="number" min="0" max="3600" step="0.1" value="1" inputmode="decimal" aria-label="Seconds between images after the first">
           </label>
-          <button type="button" id="session-start" class="session-btn" disabled>
-            <i class="fa-solid fa-play" aria-hidden="true"></i>
-            <span>Start</span>
-          </button>
         </div>
         <div id="session-live" class="session-live" hidden>
           <div id="session-timer" class="session-timer" role="timer">0:00.0</div>

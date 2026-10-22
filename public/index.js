@@ -2042,9 +2042,14 @@ function updateSessionControls() {
   const icon = start.querySelector('i');
   const label = start.querySelector('span');
   const nameOk = Boolean(fileToken(document.getElementById('session-name').value, ''));
+  const imageCount = readImageCount();
+  const intervalApplies = imageCount != null && imageCount >= 2;
+  const intervalInput = document.getElementById('session-interval');
+  intervalInput.disabled = active || !intervalApplies;
+  intervalInput.title = !active && !intervalApplies ? 'Available when taking 2 or more images' : '';
   const timingOk = readSecondsField('session-delay') != null
-    && readSecondsField('session-interval') != null
-    && readImageCount() != null;
+    && imageCount != null
+    && (!intervalApplies || readSecondsField('session-interval') != null);
   if (active) {
     start.disabled = false;
     start.classList.add('is-stop');
@@ -2118,8 +2123,8 @@ function startSession() {
   const name = document.getElementById('session-name').value.trim();
   const expected = readExpectedInputs();
   const delayMs = readSecondsField('session-delay');
-  const intervalMs = readSecondsField('session-interval');
   const imageCount = readImageCount();
+  const intervalMs = imageCount != null && imageCount >= 2 ? readSecondsField('session-interval') : 0;
   if (!fileToken(name, '') || expected == null || delayMs == null || intervalMs == null || imageCount == null || sessionState.active) return;
   sessionState.active = true;
   sessionState.shotsCancelled = false;
