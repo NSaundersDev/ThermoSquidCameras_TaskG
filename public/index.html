@@ -57,24 +57,18 @@
                   <i class="fa-solid fa-cog"></i>
                   <span>Settings</span>
                 </button>
+                <div class="capture-options">
+                  <label class="timestamp-toggle" for="front-timestamp">
+                    <input id="front-timestamp" type="checkbox" checked aria-label="Add timestamp to front camera images">
+                    Timestamp
+                  </label>
+                  <label class="filename-field" for="custom-file-name-front">
+                    File name
+                    <input id="custom-file-name-front" type="text" placeholder="Optional" maxlength="50" aria-label="Custom filename for front camera captures">
+                  </label>
+                </div>
               </div>
-          
-<div class="camera-settings-menu" id="front-settings-menu"></div>
-              <div class="camera-settings">
-                <span style="display:grid;grid-template-columns: 40% 60%;gap: 0.5em;vertical-align: central;justify-content: center;align-items: center;">
-                  <span>
-                    <label for="front-timestamp">
-                      <input id="front-timestamp" type="checkbox" checked aria-label="Add timestamp to front camera images">
-                      Add Timestamp
-                    </label>
-                  </span>
-                  <span>
-                    <label for="custom-file-name-front">Custom Name:
-                      <input id="custom-file-name-front" type="text" placeholder="Optional file name" maxlength="50" aria-label="Custom filename for front camera captures">
-                    </label>
-                  </span>
-                </span>
-              </div>
+              <div class="camera-settings-menu" id="front-settings-menu"></div>
             </div>
           </section>
           <!-- Back Camera -->
@@ -101,23 +95,18 @@
                   <i class="fa-solid fa-cog"></i>
                   <span>Settings</span>
                 </button>
+                <div class="capture-options">
+                  <label class="timestamp-toggle" for="back-timestamp">
+                    <input id="back-timestamp" type="checkbox" checked aria-label="Add timestamp to back camera images">
+                    Timestamp
+                  </label>
+                  <label class="filename-field" for="custom-file-name-back">
+                    File name
+                    <input id="custom-file-name-back" type="text" placeholder="Optional" maxlength="50" aria-label="Custom filename for back camera captures">
+                  </label>
+                </div>
               </div>
               <div class="camera-settings-menu" id="back-settings-menu"></div>
-              <div class="camera-settings">
-                <span style="display:grid;grid-template-columns: 40% 60%;gap: 0.5em;vertical-align: central;justify-content: center;align-items: center;">
-                  <span>
-                    <label for="back-timestamp">
-                      <input id="back-timestamp" type="checkbox" checked aria-label="Add timestamp to back camera images">
-                      Add Timestamp
-                    </label>
-                  </span>
-                  <span>
-                    <label for="custom-file-name-back">Custom Name:
-                      <input id="custom-file-name-back" type="text" placeholder="Optional file name" maxlength="50" aria-label="Custom filename for back camera captures">
-                    </label>
-                  </span>
-                </span>
-              </div>
             </div>
           </section>
         </div>

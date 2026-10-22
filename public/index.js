@@ -1495,7 +1495,7 @@ const CAMERA_SETTING_GROUPS = [
       { type: 'slider', id: 'contrast', label: 'Contrast', min: 0, max: 32, step: 0.1, value: 1 },
       { type: 'slider', id: 'sharpness', label: 'Sharpness', min: 0, max: 16, step: 0.1, value: 1 },
       { type: 'slider', id: 'saturation', label: 'Saturation', min: 0, max: 32, step: 0.1, value: 1 },
-      { type: 'slider', id: 'ev', label: 'Exposure value', min: -10, max: 10, step: 1, value: 0 }
+      { type: 'slider', id: 'ev', label: 'EV', title: 'Exposure value', min: -10, max: 10, step: 1, value: 0 }
     ]
   },
   {
@@ -1513,7 +1513,7 @@ const CAMERA_SETTING_GROUPS = [
         ]
       },
       {
-        type: 'select', id: 'exposure', label: 'Exposure mode',
+        type: 'select', id: 'exposure', label: 'Exposure', title: 'Exposure mode',
         options: [
           ['normal', 'Normal'],
           ['sport', 'Sport'],
@@ -1606,10 +1606,7 @@ function renderCameraSettings(camera) {
     return `<section class="settings-group"><h4>${group.title}</h4>${fields}</section>`;
   }).join('');
 
-  menu.innerHTML = `
-    <p class="settings-note">Release a slider to apply it. Enter an exact value, or pick an option, and that applies too.</p>
-    <div class="settings-groups">${groups}</div>
-  `;
+  menu.innerHTML = `<div class="settings-groups">${groups}</div>`;
 
   CAMERA_SETTING_GROUPS.forEach(group => {
     group.fields.forEach(field => bindSettingField(camera, field));
@@ -1620,19 +1617,17 @@ function renderCameraSettings(camera) {
 function renderSettingField(camera, field) {
   const inputId = `${camera}-${field.id}`;
   const labelId = `${inputId}-label`;
-  const hint = field.hint ? `<span class="setting-hint">${field.hint}</span>` : '';
   const awbClass = field.awbGain ? ' awb-gain' : '';
+  const title = field.title || field.hint || '';
+  const titleAttr = title ? ` title="${title}"` : '';
 
   if (field.type === 'select') {
     const options = field.options.map(([value, label, selected]) => {
       return `<option value="${value}"${selected ? ' selected' : ''}>${label}</option>`;
     }).join('');
     return `
-      <div class="setting-field${awbClass}">
-        <div class="setting-field-head">
-          <label id="${labelId}" for="${inputId}">${field.label}</label>
-          ${hint}
-        </div>
+      <div class="setting-field is-choice${awbClass}">
+        <label id="${labelId}" for="${inputId}"${titleAttr}>${field.label}</label>
         <select id="${inputId}" aria-labelledby="${labelId}">${options}</select>
       </div>
     `;
@@ -1645,14 +1640,9 @@ function renderSettingField(camera, field) {
   const sliderStep = field.scale === 'log' ? 1 : field.step;
   return `
     <div class="setting-field${awbClass}">
-      <div class="setting-field-head">
-        <label id="${labelId}" for="${inputId}">${field.label}</label>
-        ${hint}
-      </div>
-      <div class="setting-slider-row">
-        <input type="range" id="${inputId}-slider" min="${sliderMin}" max="${sliderMax}" step="${sliderStep}" value="${sliderValue}" aria-labelledby="${labelId}">
-        <input type="number" id="${inputId}" min="${field.min}" max="${field.max}" step="${field.step}" value="${value}" inputmode="decimal" aria-label="${field.label} value">
-      </div>
+      <label id="${labelId}" for="${inputId}"${titleAttr}>${field.label}</label>
+      <input type="range" id="${inputId}-slider" min="${sliderMin}" max="${sliderMax}" step="${sliderStep}" value="${sliderValue}" aria-labelledby="${labelId}">
+      <input type="number" id="${inputId}" min="${field.min}" max="${field.max}" step="${field.step}" value="${value}" inputmode="decimal" aria-label="${field.label} value">
     </div>
   `;
 }

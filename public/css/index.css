@@ -741,14 +741,57 @@ width: 100%;
 }
 /* UPDATED: Camera Controls - Capture overlaid on video, pause centered below */
 .camera-controls {
-  /* Capture is now overlaid, so this only handles pause/resume */
   display: flex;
-  justify-content: center;
+  flex-wrap: wrap;
+  justify-content: flex-start;
   align-items: center;
   flex-shrink: 0;
-  padding: 0.25rem 0;
-  gap: 0.5rem; /* Adjusted for settings button */
-  position: relative; /* For any future absolute positioning */
+  padding: 0.15rem 0 0;
+  gap: 0.4rem 0.6rem;
+  position: relative;
+}
+.camera-controls .control-btn.secondary {
+  margin-top: 0;
+  flex: 0 0 auto;
+  width: auto;
+}
+.capture-options {
+  display: flex;
+  flex: 1 1 14rem;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: min(100%, 14rem);
+}
+.timestamp-toggle,
+.filename-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+.timestamp-toggle input {
+  margin: 0;
+}
+.filename-field {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+.filename-field input {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0.28rem 0.45rem;
+  border: 1px solid #adb5bd;
+  border-radius: 6px;
+  background: #fff;
+  color: #212529;
+  font-size: 0.78rem;
+  font-weight: 400;
 }
 /* Overlaid capture button. Do not scale or use transition:all here:
    transforming an icon font makes the camera glyph flash a box with an X. */
@@ -833,7 +876,6 @@ width: 100%;
   margin-top: 0.25rem; /* Slight space from video */
 }
 .control-btn.secondary:hover:not(:disabled) {
-  transform: translateY(-1px);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 .control-btn i {
@@ -1739,73 +1781,61 @@ width: 100%;
 }
 .camera-settings-menu {
   display: none;
-  margin-top: 0.5rem;
-  padding: 0.75rem;
+  margin-top: 0.35rem;
+  padding: 0.4rem 0.55rem 0.25rem;
   background: #f8f9fa;
   border: 1px solid #dee2e6;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 .camera-settings-menu.is-open {
   display: block;
 }
-.settings-note {
-  margin: 0 0 0.75rem;
-  font-size: 0.8rem;
-  line-height: 1.35;
-  color: #495057;
-}
 .settings-groups {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: 0.12rem 0.75rem;
 }
 .settings-group {
-  min-width: 0;
-  padding: 0.7rem 0.75rem 0.15rem;
-  background: #fff;
-  border: 1px solid #e3e6ea;
-  border-radius: 8px;
+  display: contents;
 }
 .settings-group h4 {
-  margin: 0 0 0.55rem;
-  font-size: 0.72rem;
+  grid-column: 1 / -1;
+  margin: 0.35rem 0 0.04rem;
+  font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: #5c6770;
 }
+.settings-groups > .settings-group:first-child h4 {
+  margin-top: 0;
+}
 .setting-field {
-  margin-bottom: 0.7rem;
+  display: grid;
+  grid-template-columns: 6.6rem minmax(0, 1fr) 4.1rem;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.18rem;
   min-width: 0;
 }
-.setting-field-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 0.5rem;
-  margin-bottom: 0.25rem;
+.setting-field.is-choice {
+  grid-template-columns: 6.6rem minmax(0, 1fr);
 }
-.setting-field-head label {
-  font-size: 0.82rem;
+.setting-field label {
+  margin: 0;
+  font-size: 0.75rem;
   font-weight: 600;
+  line-height: 1.1;
   color: #212529;
-}
-.setting-hint {
-  font-size: 0.72rem;
-  color: #6c757d;
   white-space: nowrap;
-}
-.setting-slider-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 5.6rem;
-  gap: 0.55rem;
-  align-items: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .camera-settings-menu input[type="range"] {
   width: 100%;
   min-width: 0;
-  height: 1.6rem;
+  height: 1.1rem;
   margin: 0;
   accent-color: #0d6efd;
   cursor: pointer;
@@ -1816,12 +1846,12 @@ width: 100%;
   width: 100%;
   min-width: 0;
   margin: 0;
-  padding: 0.35rem 0.45rem;
+  padding: 0.12rem 0.3rem;
   border: 1px solid #adb5bd;
-  border-radius: 6px;
+  border-radius: 4px;
   background: #fff;
   color: #212529;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
 }
 .camera-settings-menu input[type="number"] {
   font-family: 'Roboto Mono', ui-monospace, monospace;
@@ -1841,8 +1871,12 @@ width: 100%;
   opacity: 0.45;
 }
 @media (max-width: 520px) {
-  .setting-slider-row {
-    grid-template-columns: minmax(0, 1fr) 4.8rem;
+  .setting-field,
+  .setting-field.is-choice {
+    grid-template-columns: 5.4rem minmax(0, 1fr) 3.6rem;
+  }
+  .setting-field.is-choice {
+    grid-template-columns: 5.4rem minmax(0, 1fr);
   }
 }
 .time-sync-overlay {
