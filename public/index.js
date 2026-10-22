@@ -87,8 +87,27 @@ function fileNameFromPath(imagePath) {
   return parts[parts.length - 1] || '';
 }
 
-function showCaptureConfirm(door, filename, ok) {
+function captureFileName(door, customName, timestamp) {
+  const cleaned = String(customName || '').replace(/[^a-zA-Z0-9-_]/g, '');
+  return `${timestamp}-${cleaned || door}.jpg`;
+}
+
+function sendSaveImage(door, imageData, customName) {
+  const timestamp = Date.now();
+  const name = customName || '';
+  imageWs.send(JSON.stringify({
+    action: 'save_image',
+    door,
+    image: imageData,
+    timestamp,
+    customName: name
+  }));
+  showCaptureConfirm(door, captureFileName(door, name, timestamp), true);
+}
+
+function showCaptureConfirm(door, filename, ok, options) {
   if (door !== 'front' && door !== 'back') return;
+  const flash = !options || options.flash !== false;
   const targets = [document.getElementById(`${door}-capture-confirm`)];
   if (currentModalCamera === door) targets.push(document.getElementById('modal-capture-confirm'));
 
@@ -108,7 +127,7 @@ function showCaptureConfirm(door, filename, ok) {
       name.title = ok ? filename : '';
     }
     const frame = el.closest('.video-container, .camera-modal-video-container');
-    if (frame && ok) {
+    if (frame && ok && flash) {
       frame.classList.remove('is-flash');
       void frame.offsetWidth;
       frame.classList.add('is-flash');
@@ -421,24 +440,33 @@ function connectCameraWebSocket(camera, ws, videoStream, canvas, ctx, timestampC
     captureButton.classList.remove('disabled');
   }
 
-  // Re-apply any pending camera config
-  if (window.pendingCameraConfig && window.pendingCameraConfig[camera]) {
-    ws.send(JSON.stringify(window.pendingCameraConfig[camera]));
-    delete window.pendingCameraConfig[camera];
+  // The form was restored from this browser. Send it once the socket is open
+  // so a restarted camera process matches the values on screen.
+  pushStoredCameraSettings(camera, ws);
+  if (!hasStoredCameraSettings(camera)) {
+    try {
+      ws.send(JSON.stringify({ action: 'get_config' }));
+    } catch (error) {
+      console.debug(`${camera} settings were not requested`);
+    }
   }
 
   showStatusMessage(`${camera} camera ready`, 800);
 };
   ws.onmessage = (event) => {
     try {
+      if (typeof event.data === 'string') {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.action === 'config') adoptCameraConfig(camera, data);
+        } catch (error) {
+          console.debug(`${camera}: text message received`);
+        }
+        return;
+      }
       const now = Date.now();
       if (now - lastUpdate < minFrameInterval || isPaused[camera]) return;
       lastUpdate = now;
-      // Handle both string and binary messages
-      if (typeof event.data === 'string') {
-        console.debug(`${camera}: text message received`);
-        return;
-      }
       const blob = new Blob([event.data], { type: 'image/jpeg' });
      
       // Relaxed size check - accept smaller frames
@@ -571,11 +599,13 @@ function connectImageWebSocket() {
   imageWs.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
-      if (data.action !== 'save_image') return;
-      if (data.status === 'saved') {
-        showCaptureConfirm(data.door, data.filename || fileNameFromPath(data.path), true);
-      } else if (data.status === 'error') {
-        showCaptureConfirm(data.door, '', false);
+      const door = data.door;
+      if (door !== 'front' && door !== 'back') return;
+      if (data.action && data.action !== 'save_image') return;
+      if (data.status === 'saved' && (data.action === 'save_image' || data.filename || data.path)) {
+        showCaptureConfirm(door, data.filename || fileNameFromPath(data.path), true, { flash: false });
+      } else if (data.status === 'error' && data.action === 'save_image') {
+        showCaptureConfirm(door, '', false);
       }
     } catch (e) {
       console.debug('Image message ignored');
@@ -1177,25 +1207,21 @@ function openCameraModal(camera) {
     modalCaptureBtn.replaceWith(modalCaptureBtn.cloneNode(true));
     const newCaptureBtn = document.getElementById('modal-capture-btn');
     newCaptureBtn.onclick = () => {
-      if (currentModalCamera && imageWs.readyState === WebSocket.OPEN) {
-        const lastImage = lastCapturedImages[currentModalCamera];
+      const camera = currentModalCamera;
+      if (camera && imageWs.readyState === WebSocket.OPEN) {
+        const lastImage = lastCapturedImages[camera];
         if (lastImage && lastImage.image) {
           const customName = modalFilenameInput?.value?.trim() || '';
-          const videoStream = currentModalCamera === 'front' ? frontVideoStream : backVideoStream;
+          const videoStream = camera === 'front' ? frontVideoStream : backVideoStream;
          
-          getTimestampedImage(videoStream, currentModalCamera, lastImage.timestamp,
+          getTimestampedImage(videoStream, camera, lastImage.timestamp,
             modalTimestampEnabled ? {checked: true} : {checked: false})
             .then((imageData) => {
-              imageWs.send(JSON.stringify({
-                action: 'save_image',
-                door: currentModalCamera,
-                image: imageData,
-                timestamp: Date.now(),
-                customName: customName
-              }));
+              sendSaveImage(camera, imageData, customName);
             })
             .catch((error) => {
               console.error('Modal capture error:', error);
+              showCaptureConfirm(camera, '', false);
               showStatusMessage('Capture failed', 2000);
             });
         }
@@ -1430,17 +1456,12 @@ if (syncTimeBtn) {
 
           getTimestampedImage(videoStream, camera, lastImage.timestamp, timestampCheckbox)
             .then((imageData) => {
-              imageWs.send(JSON.stringify({
-                action: 'save_image',
-                door: camera,
-                image: imageData,
-                timestamp: Date.now(),
-                customName: customName
-              }));
+              sendSaveImage(camera, imageData, customName);
             })
             .catch((error) => {
               console.error('Failed to get image data:', error);
-              showStatusMessage('Image processing failed', 2000);
+              showCaptureConfirm(camera, '', false);
+              showStatusMessage('Capture failed', 2000);
             })
             .finally(() => {
               button.dataset.busy = 'false';
@@ -1733,6 +1754,11 @@ function toggleSettingsMenu(camera) {
   menu.classList.toggle('is-open');
 }
 
+const CAMERA_SETTINGS_STORAGE_KEY = 'thermosquid.cameraSettings';
+const CAMERA_SETTING_FIELDS = new Map();
+CAMERA_SETTING_GROUPS.forEach(group => {
+  group.fields.forEach(field => CAMERA_SETTING_FIELDS.set(field.id, field));
+});
 const lastSentCameraSettings = { front: '', back: '' };
 
 function readSettingNumber(id, fallback) {
@@ -1740,15 +1766,92 @@ function readSettingNumber(id, fallback) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-renderCameraSettings('front');
-renderCameraSettings('back');
+function readStoredCameraSettings() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CAMERA_SETTINGS_STORAGE_KEY) || '{}');
+    if (!parsed || typeof parsed !== 'object') return {};
+    return parsed;
+  } catch (error) {
+    return {};
+  }
+}
 
-function applyCameraSettings(camera) {
+function writeStoredCameraSettings(camera, settings) {
+  try {
+    const all = readStoredCameraSettings();
+    all[camera] = settings;
+    localStorage.setItem(CAMERA_SETTINGS_STORAGE_KEY, JSON.stringify(all));
+  } catch (error) {
+    console.debug('Camera settings were not stored');
+  }
+}
+
+function restoreSelect(id, value) {
+  const select = document.getElementById(id);
+  if (!select || value == null) return;
+  const text = String(value);
+  if ([...select.options].some(option => option.value === text)) {
+    select.value = text;
+  }
+}
+
+function restoreSlider(camera, fieldId, raw) {
+  const field = CAMERA_SETTING_FIELDS.get(fieldId);
+  const input = document.getElementById(`${camera}-${fieldId}`);
+  const slider = document.getElementById(`${camera}-${fieldId}-slider`);
+  const value = Number(raw);
+  if (!field || !input || !slider || !Number.isFinite(value)) return;
+  const clamped = clampSetting(value, field.min, field.max);
+  input.value = formatSettingValue(clamped, field.step);
+  slider.value = sliderPositionFor(field, clamped);
+}
+
+function hasStoredCameraSettings(camera) {
+  const stored = readStoredCameraSettings()[camera];
+  return Boolean(stored && typeof stored === 'object' && Number.isFinite(Number(stored.width)) && Number.isFinite(Number(stored.height)));
+}
+
+function applySettingsObject(camera, stored) {
+  if (!stored || typeof stored !== 'object') return false;
+  if (!Number.isFinite(Number(stored.width)) || !Number.isFinite(Number(stored.height))) return false;
+
+  restoreSelect(`${camera}-resolution`, `${stored.width}x${stored.height}`);
+  restoreSelect(`${camera}-framerate`, stored.framerate);
+  restoreSelect(`${camera}-metering`, stored.metering);
+  restoreSelect(`${camera}-exposure`, stored.exposure);
+  restoreSelect(`${camera}-awb`, stored.awb);
+  restoreSelect(`${camera}-denoise`, stored.denoise);
+  restoreSlider(camera, 'brightness', stored.brightness);
+  restoreSlider(camera, 'contrast', stored.contrast);
+  restoreSlider(camera, 'sharpness', stored.sharpness);
+  restoreSlider(camera, 'saturation', stored.saturation);
+  restoreSlider(camera, 'ev', stored.ev);
+  restoreSlider(camera, 'shutter', stored.shutter);
+  restoreSlider(camera, 'gain', stored.gain);
+  restoreSlider(camera, 'awb-red', stored.awb_red);
+  restoreSlider(camera, 'awb-blue', stored.awb_blue);
+  updateAwbGainFields(camera);
+  return true;
+}
+
+function restoreCameraSettings(camera) {
+  applySettingsObject(camera, readStoredCameraSettings()[camera]);
+}
+
+function adoptCameraConfig(camera, config) {
+  if (hasStoredCameraSettings(camera)) return;
+  if (!applySettingsObject(camera, config)) return;
+  const settings = buildCameraSettings(camera);
+  writeStoredCameraSettings(camera, settings);
+  lastSentCameraSettings[camera] = JSON.stringify(settings);
+}
+
+function buildCameraSettings(camera) {
   const resolutionSelect = document.getElementById(`${camera}-resolution`);
   const framerateSelect = document.getElementById(`${camera}-framerate`);
   const [width, height] = resolutionSelect.value.split('x');
 
-  const settings = {
+  return {
     action: 'set_config',
     width: parseInt(width, 10),
     height: parseInt(height, 10),
@@ -1767,21 +1870,44 @@ function applyCameraSettings(camera) {
     awb_blue: readSettingNumber(`${camera}-awb-blue`, 1),
     denoise: document.getElementById(`${camera}-denoise`).value || 'auto'
   };
+}
 
-  const payload = JSON.stringify(settings);
-  if (lastSentCameraSettings[camera] === payload) return;
+function pushStoredCameraSettings(camera, ws) {
+  const stored = readStoredCameraSettings()[camera];
+  if (!stored || typeof stored !== 'object') return;
+  if (!Number.isFinite(Number(stored.width)) || !Number.isFinite(Number(stored.height))) return;
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+  const payload = JSON.stringify(buildCameraSettings(camera));
+  try {
+    ws.send(payload);
+  } catch (error) {
+    console.debug(`${camera} settings were not sent`);
+    return;
+  }
   lastSentCameraSettings[camera] = payload;
+}
+
+function applyCameraSettings(camera) {
+  const settings = buildCameraSettings(camera);
+  const payload = JSON.stringify(settings);
+  writeStoredCameraSettings(camera, settings);
 
   const cameraWs = camera === 'front' ? frontCameraWs : backCameraWs;
-
-  if (cameraWs && cameraWs.readyState === WebSocket.OPEN) {
-    cameraWs.send(payload);
-    showStatusMessage(`${camera} settings applied`, 1000);
-    console.log(`Sent settings for ${camera}:`, settings);
-  } else {
+  if (!cameraWs || cameraWs.readyState !== WebSocket.OPEN) {
     showStatusMessage(`${camera} camera not connected`, 2000);
+    return;
   }
+  if (lastSentCameraSettings[camera] === payload) return;
+  lastSentCameraSettings[camera] = payload;
+  cameraWs.send(payload);
+  showStatusMessage(`${camera} settings applied`, 1000);
 }
+
+renderCameraSettings('front');
+renderCameraSettings('back');
+restoreCameraSettings('front');
+restoreCameraSettings('back');
 window.addEventListener('beforeunload', () => {
   navigator.sendBeacon?.('/api/camera/stop', '');
 });

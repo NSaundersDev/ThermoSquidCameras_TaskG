@@ -239,6 +239,14 @@ function createPipeline(name, camIndex, port) {
     ws.on('message', (msg) => {
       try {
         const data = JSON.parse(msg);
+        if (data.action === 'get_config') {
+          try {
+            ws.send(JSON.stringify({ action: 'config', ...pipeline.config }));
+          } catch (err) {
+            console.error(`${name} config send error:`, err.message);
+          }
+          return;
+        }
         if (data.action !== 'set_config') return;
         console.log(`[SETTINGS] Received from ${name}:`, data);
         pipeline.config = sanitizeConfig(data, pipeline.config);
