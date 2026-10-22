@@ -1621,11 +1621,15 @@ function renderCameraSettings(camera) {
     return `<section class="settings-group"><h4>${group.title}</h4>${fields}</section>`;
   }).join('');
 
-  menu.innerHTML = `<div class="settings-groups">${groups}</div>`;
+  menu.innerHTML = `<div class="settings-groups">${groups}</div>
+    <div class="settings-reset-row">
+      <button type="button" class="settings-reset" data-camera="${camera}">Reset</button>
+    </div>`;
 
   CAMERA_SETTING_GROUPS.forEach(group => {
     group.fields.forEach(field => bindSettingField(camera, field));
   });
+  menu.querySelector('.settings-reset').addEventListener('click', () => openSettingsReset(camera));
   updateAwbGainFields(camera);
 }
 
@@ -1843,6 +1847,60 @@ function pushStoredCameraSettings(camera, ws) {
   lastSentCameraSettings[camera] = payload;
 }
 
+function defaultSelectValue(field) {
+  const chosen = field.options.find((option) => option[2]);
+  return (chosen || field.options[0])[0];
+}
+
+let settingsResetCamera = null;
+let settingsResetReturn = null;
+
+function openSettingsReset(camera) {
+  settingsResetCamera = camera;
+  settingsResetReturn = document.querySelector(`#${camera}-settings-menu .settings-reset`);
+  const dialog = document.getElementById('settings-reset-dialog');
+  dialog.hidden = false;
+  document.getElementById('settings-reset-cancel').focus();
+}
+
+function closeSettingsReset() {
+  const dialog = document.getElementById('settings-reset-dialog');
+  dialog.hidden = true;
+  const returnFocus = settingsResetReturn;
+  settingsResetCamera = null;
+  settingsResetReturn = null;
+  if (returnFocus) returnFocus.focus();
+}
+
+function resetCameraSettings(camera) {
+  CAMERA_SETTING_GROUPS.forEach((group) => {
+    group.fields.forEach((field) => {
+      if (field.type === 'select') restoreSelect(`${camera}-${field.id}`, defaultSelectValue(field));
+      else restoreSlider(camera, field.id, field.value);
+    });
+  });
+  updateAwbGainFields(camera);
+  applyCameraSettings(camera);
+}
+
+function confirmSettingsReset() {
+  const camera = settingsResetCamera;
+  closeSettingsReset();
+  if (camera) resetCameraSettings(camera);
+}
+
+function bindSettingsResetDialog() {
+  const dialog = document.getElementById('settings-reset-dialog');
+  document.getElementById('settings-reset-cancel').addEventListener('click', closeSettingsReset);
+  document.getElementById('settings-reset-confirm').addEventListener('click', confirmSettingsReset);
+  dialog.addEventListener('click', (event) => {
+    if (event.target === dialog) closeSettingsReset();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !dialog.hidden) closeSettingsReset();
+  });
+}
+
 function applyCameraSettings(camera) {
   const settings = buildCameraSettings(camera);
   const payload = JSON.stringify(settings);
@@ -1861,6 +1919,7 @@ function applyCameraSettings(camera) {
 
 renderCameraSettings('front');
 renderCameraSettings('back');
+bindSettingsResetDialog();
 restoreCameraSettings('front');
 restoreCameraSettings('back');
 
