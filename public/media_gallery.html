@@ -7,9 +7,13 @@
   <link rel="stylesheet" href="/css/media_gallery.css">
 </head>
 <body>
-  <header>
-    <h1 id="gallery-title">MEDIA GALLERY</h1>
-    <a id="gallery-back" class="gallery-back" href="media_gallery.html" hidden>All images</a>
+  <header>    <h1 style="margin-top:0.25em;" id="gallery-title">MEDIA GALLERY</h1>
+
+    <a id="gallery-back" class="gallery-back my-link" href="media_gallery.html" hidden >
+      <i class="fa fa-arrow-circle-left" aria-hidden="true"></i>
+    Back to Sessions and Images</a>
+
+
     <p id="gallery-heading" class="gallery-heading" hidden></p>
     <nav>
       <input type="date" id="date-filter">
@@ -37,3 +41,13 @@
   <script type="module" src="media_gallery.js"></script>
 </body>
 </html>
+
+<style>
+  .my-link {font-size:x-large;border-radius:4%;color:rgb(116, 188, 254);outline:none;padding:0.5em;
+  }
+
+  .my-link:hover {
+    color: rgb(5, 134, 255);
+    text-decoration: underline;
+  }
+</style>
