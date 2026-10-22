@@ -79,6 +79,52 @@ let isAlertVisible = false;
 let alertModal = null;
 
 // Status messages - only show helpful ones
+const captureConfirmTimers = new Map();
+
+function fileNameFromPath(imagePath) {
+  if (!imagePath) return '';
+  const parts = String(imagePath).split('/');
+  return parts[parts.length - 1] || '';
+}
+
+function showCaptureConfirm(door, filename, ok) {
+  if (door !== 'front' && door !== 'back') return;
+  const targets = [document.getElementById(`${door}-capture-confirm`)];
+  if (currentModalCamera === door) targets.push(document.getElementById('modal-capture-confirm'));
+
+  targets.forEach((el) => {
+    if (!el) return;
+    el.dataset.camera = door;
+    el.hidden = false;
+    el.classList.toggle('is-error', !ok);
+    const icon = el.querySelector('i');
+    if (icon) icon.className = ok ? 'fa-solid fa-circle-check' : 'fa-solid fa-circle-exclamation';
+    const label = el.querySelector('.capture-confirm-label');
+    if (label) label.textContent = ok ? 'Saved' : 'Capture failed';
+    const name = el.querySelector('.capture-confirm-name');
+    if (name) {
+      name.textContent = ok ? filename : '';
+      name.hidden = !ok || !filename;
+      name.title = ok ? filename : '';
+    }
+    const frame = el.closest('.video-container, .camera-modal-video-container');
+    if (frame && ok) {
+      frame.classList.remove('is-flash');
+      void frame.offsetWidth;
+      frame.classList.add('is-flash');
+      setTimeout(() => frame.classList.remove('is-flash'), 500);
+    }
+  });
+
+  clearTimeout(captureConfirmTimers.get(door));
+  captureConfirmTimers.set(door, setTimeout(() => {
+    const panel = document.getElementById(`${door}-capture-confirm`);
+    if (panel) panel.hidden = true;
+    const modalConfirm = document.getElementById('modal-capture-confirm');
+    if (modalConfirm && modalConfirm.dataset.camera === door) modalConfirm.hidden = true;
+  }, 4500));
+}
+
 function showStatusMessage(message, duration = 1500) {
   if (!statusMessage) return;
  
@@ -525,8 +571,11 @@ function connectImageWebSocket() {
   imageWs.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
-      if (data.action === 'image_saved') {
-        showCaptureFeedback(data.path);
+      if (data.action !== 'save_image') return;
+      if (data.status === 'saved') {
+        showCaptureConfirm(data.door, data.filename || fileNameFromPath(data.path), true);
+      } else if (data.status === 'error') {
+        showCaptureConfirm(data.door, '', false);
       }
     } catch (e) {
       console.debug('Image message ignored');
@@ -1144,15 +1193,6 @@ function openCameraModal(camera) {
                 timestamp: Date.now(),
                 customName: customName
               }));
-             
-              // Flash feedback in modal
-              const modalVideoContainer = document.querySelector('.camera-modal-video-container');
-              if (modalVideoContainer) {
-                modalVideoContainer.classList.add('camera-flash');
-                setTimeout(() => modalVideoContainer.classList.remove('camera-flash'), 600);
-              }
-             
-              showStatusMessage(`Captured: ${customName || 'image.jpg'}`, 2000);
             })
             .catch((error) => {
               console.error('Modal capture error:', error);

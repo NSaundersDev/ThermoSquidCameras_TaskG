@@ -132,31 +132,30 @@ wss.on('connection', (ws) => {
       if (data.action === 'save_image') {
         const { door, image, timestamp = Date.now(), customName } = data;
         if (!['front', 'back'].includes(door) || !image) {
-          ws.send(JSON.stringify({ status: 'error', message: 'Invalid door or image' }));
+          ws.send(JSON.stringify({ status: 'error', action: 'save_image', door, message: 'Invalid door or image' }));
           return;
         }
         const date = new Date(timestamp).toISOString().split('T')[0];
         const dir = await ensureDir(door, date);
         const safeCustomName = customName && customName.replace(/[^a-zA-Z0-9-_]/g, '') ? customName.replace(/[^a-zA-Z0-9-_]/g, '') : door;
-        const filename = path.join(dir, `${timestamp}-${safeCustomName}.jpg`);
+        const fileName = `${timestamp}-${safeCustomName}.jpg`;
+        const filename = path.join(dir, fileName);
         console.log('Saving image:', { filename, customName, safeCustomName });
-        if (typeof image === 'string' && image.startsWith('data:image/jpeg;base64,')) {
-          const base64Data = image.replace(/^data:image\/jpeg;base64,/, '');
-          await fs.writeFile(filename, base64Data, 'base64').catch(err => {
-            console.error('Error writing image:', err);
-            ws.send(JSON.stringify({ status: 'error', message: `Failed to save image: ${err.message}` }));
-            return;
-          });
-        } else {
-          await fs.writeFile(filename, Buffer.from(image)).catch(err => {
-            console.error('Error writing image:', err);
-            ws.send(JSON.stringify({ status: 'error', message: `Failed to save image: ${err.message}` }));
-            return;
-          });
+        try {
+          if (typeof image === 'string' && image.startsWith('data:image/jpeg;base64,')) {
+            const base64Data = image.replace(/^data:image\/jpeg;base64,/, '');
+            await fs.writeFile(filename, base64Data, 'base64');
+          } else {
+            await fs.writeFile(filename, Buffer.from(image));
+          }
+        } catch (err) {
+          console.error('Error writing image:', err);
+          ws.send(JSON.stringify({ status: 'error', action: 'save_image', door, message: `Failed to save image: ${err.message}` }));
+          return;
         }
         console.log(`Saved image: ${filename}`);
-        const imagePath = `/images/${door}/${date}/${timestamp}-${safeCustomName}.jpg`;
-        ws.send(JSON.stringify({ status: 'saved', door, timestamp, path: imagePath }));
+        const imagePath = `/images/${door}/${date}/${fileName}`;
+        ws.send(JSON.stringify({ status: 'saved', action: 'save_image', door, timestamp, path: imagePath, filename: fileName }));
         // Trigger gallery refresh
         const images = await listImages(door, date);
         wss.clients.forEach(client => {

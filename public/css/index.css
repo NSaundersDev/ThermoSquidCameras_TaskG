@@ -845,6 +845,67 @@ width: 100%;
   opacity: 0.75;
   cursor: progress;
 }
+.capture-confirm {
+  position: absolute;
+  top: 0.55rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  max-width: calc(100% - 1.25rem);
+  padding: 0.35rem 0.65rem;
+  background: rgba(20, 92, 42, 0.94);
+  color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+}
+.capture-confirm[hidden] {
+  display: none;
+}
+.capture-confirm.is-error {
+  background: rgba(132, 32, 32, 0.94);
+}
+.capture-confirm i {
+  flex: 0 0 auto;
+  font-size: 1rem;
+}
+.capture-confirm-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.capture-confirm-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.capture-confirm-name {
+  font-family: Consolas, "Segoe UI Mono", monospace;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.video-container.is-flash::after,
+.camera-modal-video-container.is-flash::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  z-index: 3;
+  pointer-events: none;
+  animation: captureFlash 0.45s ease-out forwards;
+}
+@keyframes captureFlash {
+  0% { opacity: 0.8; }
+  100% { opacity: 0; }
+}
 /* UPDATED: Tighter Offset for ~15px effective gap - Front to right, Back to left */
 .front-camera-section .control-btn.primary {
   left: auto;

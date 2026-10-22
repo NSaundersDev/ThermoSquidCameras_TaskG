@@ -41,6 +41,13 @@
                   <img id="front-video-stream" class="camera-feed" alt="Front camera stream" style="display: none;" />
                   <canvas id="front-canvas" class="overlay-canvas" style="display: none;"></canvas>
                 </div>
+                <div id="front-capture-confirm" class="capture-confirm" hidden role="status" aria-live="polite">
+                  <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                  <span class="capture-confirm-copy">
+                    <span class="capture-confirm-label">Saved</span>
+                    <span class="capture-confirm-name"></span>
+                  </span>
+                </div>
                 <!-- FIXED: Capture button nested inside video-container for overlay -->
                 <button id="capture-front-image" class="control-btn primary disabled" data-camera="front" data-action="capture" disabled aria-label="Capture front camera image">
                   <i class="fa-solid fa-camera"></i>
@@ -78,6 +85,13 @@
                 <div class="video-wrapper">
                   <img id="back-video-stream" class="camera-feed" alt="Back camera stream" style="display: none;" />
                   <canvas id="back-canvas" class="overlay-canvas" style="display: none;"></canvas>
+                </div>
+                <div id="back-capture-confirm" class="capture-confirm" hidden role="status" aria-live="polite">
+                  <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                  <span class="capture-confirm-copy">
+                    <span class="capture-confirm-label">Saved</span>
+                    <span class="capture-confirm-name"></span>
+                  </span>
                 </div>
                 <!-- FIXED: Capture button nested inside video-container for overlay -->
                 <button id="capture-back-image" class="control-btn primary disabled" data-camera="back" data-action="capture" disabled aria-label="Capture back camera image">
@@ -120,6 +134,13 @@
           </button>
         </div>
         <div class="camera-modal-video-container">
+          <div id="modal-capture-confirm" class="capture-confirm" hidden role="status" aria-live="polite">
+            <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+            <span class="capture-confirm-copy">
+              <span class="capture-confirm-label">Saved</span>
+              <span class="capture-confirm-name"></span>
+            </span>
+          </div>
           <img id="modal-video-stream" class="modal-camera-feed" alt="Large camera view" />
           <canvas id="modal-canvas" class="modal-overlay-canvas"></canvas>
           <div class="modal-controls">
