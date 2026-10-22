@@ -1998,15 +1998,16 @@ function sessionImageBaseName(sessionName, cameraLabel, inputNumber, when, shotI
   const date = when instanceof Date ? when : new Date();
   const datePart = `${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}${String(date.getFullYear()).slice(-2)}`;
   const count = String(inputNumber).padStart(2, '0');
-  const shot = total > 1 ? `-${String(shotIndex).padStart(2, '0')}` : '';
+  const shot = total > 1 ? `--${String(shotIndex).padStart(2, '0')}` : '';
   let sessionToken = fileToken(sessionName, 'Session');
   let cameraToken = fileToken(cameraLabel, 'Camera');
-  const room = 80 - datePart.length - count.length - shot.length - 3;
+  const fixed = datePart.length + count.length + shot.length + 6;
+  const room = 80 - fixed;
   if (sessionToken.length + cameraToken.length > room) {
     sessionToken = sessionToken.slice(0, Math.max(1, room - 1));
     cameraToken = cameraToken.slice(0, Math.max(1, room - sessionToken.length));
   }
-  return `${datePart}-${sessionToken}-${cameraToken}-${count}${shot}`;
+  return `${datePart}--${sessionToken}--${cameraToken}--${count}${shot}`;
 }
 
 function readSecondsField(id) {

@@ -8,11 +8,13 @@
 </head>
 <body>
   <header>
-    <h1>MEDIA GALLERY</h1>
-   <nav>
-    <input type="date" id="date-filter">
-    <button id="refresh-images">Refresh</button>
-  </nav>
+    <h1 id="gallery-title">MEDIA GALLERY</h1>
+    <a id="gallery-back" class="gallery-back" href="media_gallery.html" hidden>All images</a>
+    <p id="gallery-heading" class="gallery-heading" hidden></p>
+    <nav>
+      <input type="date" id="date-filter">
+      <button id="refresh-images">Refresh</button>
+    </nav>
   </header>
   <main>
     <div id="image-grid"></div>

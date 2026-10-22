@@ -81,6 +81,34 @@ main {
   height: 100px;
   object-fit: cover;
   border-radius: 4px;
+  cursor: pointer;
+}
+a.session-card {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+.session-title {
+  margin: 0.45rem 0 0.15rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+[hidden] {
+  display: none !important;
+}
+.gallery-back {
+  display: inline-block;
+  margin: 0.75rem auto 0;
+  color: #fff;
+  font-weight: 700;
+}
+.gallery-heading {
+  margin: 0.35rem 0 0;
+  text-align: center;
+  font-size: 1.15rem;
+}
+header {
+  text-align: center;
 }
 
 .image-card p {
@@ -91,7 +119,8 @@ main {
 .image-card p.file-name {
   font-size: 0.8rem; /* Slightly smaller for hierarchy */
   color: #ccc; /* Lighter gray to distinguish from timestamp */
-  word-break: break-all; /* Handle long names */
+  line-height: 1.25;
+  overflow-wrap: break-word;
 }
 
 #modal-file-name {
@@ -248,6 +277,7 @@ main {
   justify-content: center;
   gap: 1rem;
   margin-top: 1rem;
+  grid-column: 1 / -1;
 }
 .pagination button {
   background-color: #3c3c3c;

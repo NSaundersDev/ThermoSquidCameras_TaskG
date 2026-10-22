@@ -50,11 +50,15 @@ function connectWebSocket() {
   };
 }
 
+function selectedSessionKey() {
+  return new URLSearchParams(window.location.search).get('session');
+}
+
 function fetchImages() {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
   const dateEl = document.getElementById('date-filter');
-  const date = dateEl ? dateEl.value : '';
+  const date = selectedSessionKey() || !dateEl ? '' : dateEl.value;
 
   ws.send(JSON.stringify({
     action: 'list_images',
@@ -97,14 +101,252 @@ function downloadFile(filePath) {
   document.body.removeChild(a);
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]));
+}
+
+function fileNameHtml(fileName) {
+  return escapeHtml(fileName).replace(/--/g, '--\u0000').replace(/-/g, '-<wbr>').replace(/\u0000/g, '<wbr>');
+}
+
+function imageFileName(img) {
+  if (img.name) return img.name;
+  const path = String(img.path || '');
+  return decodeURIComponent(path.split('/').pop() || path);
+}
+
+function imageBaseName(fileName) {
+  return String(fileName).replace(/\.(jpe?g|png)$/i, '');
+}
+
+function parseModernSession(fileName) {
+  const match = imageBaseName(fileName).match(/^(\d{6})--(.+?)--(.+?)--(\d{2})(?:--(\d{2}))?$/);
+  if (!match) return null;
+  return {
+    date: match[1],
+    session: match[2],
+    camera: match[3],
+    count: match[4],
+    shot: match[5] || '',
+    key: `${match[1]}--${match[2]}`
+  };
+}
+
+function parseLegacySession(fileName) {
+  const base = imageBaseName(fileName);
+  if (/^\d{13}-/.test(base)) return null;
+  const match = base.match(/^(\d{6})-(.+)-(\d{2})(?:-(\d{2}))?$/);
+  if (!match) return null;
+  return {
+    date: match[1],
+    body: match[2],
+    count: match[3],
+    shot: match[4] || ''
+  };
+}
+
+function commonSessionPrefix(left, right) {
+  const a = left.split('-');
+  const b = right.split('-');
+  const shared = [];
+  for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    if (a[i] !== b[i]) break;
+    shared.push(a[i]);
+  }
+  if (!shared.length || shared.length === a.length || shared.length === b.length) return '';
+  return shared.join('-');
+}
+
+function groupLegacySessions(items) {
+  const byDate = new Map();
+  items.forEach((item) => {
+    const list = byDate.get(item.parsed.date) || [];
+    list.push(item);
+    byDate.set(item.parsed.date, list);
+  });
+
+  const groups = [];
+  byDate.forEach((dateItems, date) => {
+    const bodies = [...new Set(dateItems.map((item) => item.parsed.body))];
+    const sessionOf = new Map();
+    const used = new Set();
+    const pairs = [];
+    for (let i = 0; i < bodies.length; i++) {
+      for (let j = i + 1; j < bodies.length; j++) {
+        const prefix = commonSessionPrefix(bodies[i], bodies[j]);
+        if (!prefix) continue;
+        const sharesCount = dateItems.some((left) => left.parsed.body === bodies[i]
+          && dateItems.some((right) => right.parsed.body === bodies[j] && left.parsed.count === right.parsed.count));
+        if (sharesCount) pairs.push({ a: bodies[i], b: bodies[j], prefix, length: prefix.split('-').length });
+      }
+    }
+    pairs.sort((a, b) => b.length - a.length);
+    pairs.forEach((pair) => {
+      if (used.has(pair.a) || used.has(pair.b)) return;
+      used.add(pair.a);
+      used.add(pair.b);
+      sessionOf.set(pair.a, pair.prefix);
+      sessionOf.set(pair.b, pair.prefix);
+    });
+    bodies.forEach((body) => {
+      if (!sessionOf.has(body)) sessionOf.set(body, body);
+    });
+
+    const grouped = new Map();
+    dateItems.forEach((item) => {
+      const session = sessionOf.get(item.parsed.body);
+      const key = `${date}--${session}`;
+      const group = grouped.get(key) || { key, date, session, images: [] };
+      item.parsed = { ...item.parsed, session, key };
+      group.images.push(item);
+      grouped.set(key, group);
+    });
+    grouped.forEach((group) => groups.push(group));
+  });
+  return groups;
+}
+
+function classifyImages(images) {
+  const loose = [];
+  const modern = new Map();
+  const legacy = [];
+  images.forEach((img) => {
+    const name = imageFileName(img);
+    const parsed = parseModernSession(name);
+    if (parsed) {
+      const copy = { ...img, parsed };
+      const group = modern.get(parsed.key) || { key: parsed.key, date: parsed.date, session: parsed.session, images: [] };
+      group.images.push(copy);
+      modern.set(parsed.key, group);
+      return;
+    }
+    const old = parseLegacySession(name);
+    if (old) {
+      legacy.push({ ...img, parsed: old });
+      return;
+    }
+    loose.push(img);
+  });
+  return { groups: [...modern.values(), ...groupLegacySessions(legacy)], loose };
+}
+
+function formatSessionDate(date) {
+  const match = String(date).match(/^(\d{2})(\d{2})(\d{2})$/);
+  if (!match) return date;
+  return `${match[1]}/${match[2]}/${match[3]}`;
+}
+
+function sessionHeading(key) {
+  const parts = String(key || '').split('--');
+  const date = parts.shift() || '';
+  const session = parts.join('--');
+  const formatted = formatSessionDate(date);
+  if (session && formatted) return `${session} · ${formatted}`;
+  return session || formatted || String(key || '');
+}
+
+function applyGalleryMode() {
+  const key = selectedSessionKey();
+  const back = document.getElementById('gallery-back');
+  const heading = document.getElementById('gallery-heading');
+  const dateFilter = document.getElementById('date-filter');
+  const onSession = Boolean(key);
+  if (back) back.hidden = !onSession;
+  if (heading) {
+    heading.hidden = !onSession;
+    heading.textContent = onSession ? sessionHeading(key) : '';
+  }
+  if (dateFilter) dateFilter.hidden = onSession;
+}
+
+function compareSessionImages(a, b) {
+  const count = String(a.parsed?.count || '').localeCompare(String(b.parsed?.count || ''));
+  if (count) return count;
+  const shot = String(a.parsed?.shot || '').localeCompare(String(b.parsed?.shot || ''));
+  if (shot) return shot;
+  if (a.door === b.door) return 0;
+  return a.door === 'front' ? -1 : 1;
+}
+
+function entryTime(entry) {
+  const images = entry.type === 'session' ? entry.group.images : [entry.img];
+  return Math.max(...images.map((img) => Number(img.timestamp) || 0));
+}
+
+function galleryEntries(images) {
+  const key = selectedSessionKey();
+  const classified = classifyImages(images);
+  if (key) {
+    const group = classified.groups.find((item) => item.key === key);
+    return (group ? group.images : []).sort(compareSessionImages).map((img) => ({ type: 'image', img }));
+  }
+  const entries = [
+    ...classified.groups.map((group) => ({ type: 'session', group })),
+    ...classified.loose.map((img) => ({ type: 'image', img }))
+  ];
+  entries.sort((a, b) => entryTime(b) - entryTime(a));
+  return entries;
+}
+
+function renderImageCard(img) {
+  const card = document.createElement('div');
+  card.className = 'image-card';
+  const label = getDoorLabel(img.door);
+  let badgeColor = '#555';
+  if (img.door === 'front') badgeColor = '#0d6efd';
+  if (img.door === 'back') badgeColor = '#198754';
+  const fileName = imageFileName(img);
+  card.innerHTML = `
+    <img src="${escapeHtml(img.path)}" alt="${escapeHtml(fileName)}" loading="lazy">
+    <p class="file-name">${fileNameHtml(fileName)}</p>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; gap: 8px;">
+      <p style="margin: 0; font-size: 0.85rem; color: #ccc; white-space: nowrap;">
+        ${new Date(img.timestamp).toLocaleString()}
+      </p>
+      <span style="font-size: 0.7rem; background: ${badgeColor}; color: white; padding: 2px 8px; border-radius: 4px; white-space: nowrap;">
+        ${escapeHtml(label)}
+      </span>
+    </div>
+    <button class="view-btn" type="button">View</button>
+    <button class="download" type="button">Download</button>
+  `;
+  const open = () => showModal(img.path, img.door, img.timestamp);
+  card.querySelector('img').onclick = open;
+  card.querySelector('.view-btn').onclick = open;
+  card.querySelector('.download').onclick = () => downloadFile(img.path);
+  return card;
+}
+
+function renderSessionCard(group) {
+  const preview = [...group.images].sort(compareSessionImages)[0];
+  const fileName = imageFileName(preview);
+  const link = document.createElement('a');
+  link.className = 'image-card session-card';
+  link.href = `media_gallery.html?session=${encodeURIComponent(group.key)}`;
+  link.innerHTML = `
+    <img src="${escapeHtml(preview.path)}" alt="${escapeHtml(fileName)}" loading="lazy">
+    <p class="file-name">${fileNameHtml(fileName)}</p>
+    <p class="session-title">${escapeHtml(group.session)}</p>
+    <p class="session-meta">${escapeHtml(formatSessionDate(group.date))} · ${group.images.length} images</p>
+  `;
+  return link;
+}
+
 function renderImages() {
   if (isRendering) return;
   isRendering = true;
 
   const grid = document.getElementById('image-grid');
   grid.innerHTML = '';
+  const entries = galleryEntries(currentImages);
 
-  if (!currentImages.length) {
+  if (!entries.length) {
     grid.innerHTML = '<p style="padding: 2rem; color: #666;">No images found.</p>';
     isRendering = false;
     return;
@@ -113,48 +355,13 @@ function renderImages() {
   const imagesPerPage = 20;
   const start = (currentPage - 1) * imagesPerPage;
   const end = start + imagesPerPage;
-  const pageItems = currentImages.slice(start, end);
+  const pageItems = entries.slice(start, end);
 
-  pageItems.forEach(img => {
-    const card = document.createElement('div');
-    card.className = 'image-card';
-
-    const label = getDoorLabel(img.door);
-    let badgeColor = '#555';
-    if (img.door === 'front') badgeColor = '#0d6efd';
-    if (img.door === 'back') badgeColor = '#198754';
-
-    card.innerHTML = `
-    <img src="${img.path}" alt="${img.door} media" loading="lazy">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; gap: 8px;">
-        <p style="margin: 0; font-size: 0.85rem; color: #ccc; white-space: nowrap;">
-        ${new Date(img.timestamp).toLocaleString()}
-        </p>
-        <span style="
-        font-size: 0.7rem;
-        background: ${badgeColor};
-        color: white;
-        padding: 2px 8px;
-        border-radius: 4px;
-        white-space: nowrap;
-        ">
-        ${label}
-        </span>
-    </div>
-    <button class="view-btn">View</button>
-    <button class="download">Download</button>
-    `;
-    card.querySelector('.download').onclick = () => {
-      downloadFile(img.path);
-    };
-    card.querySelector('.view-btn').onclick = () => {
-      showModal(img.path, img.door, img.timestamp);
-    };
-
-    grid.appendChild(card);
+  pageItems.forEach((entry) => {
+    grid.appendChild(entry.type === 'session' ? renderSessionCard(entry.group) : renderImageCard(entry.img));
   });
 
-  const totalPages = Math.ceil(currentImages.length / imagesPerPage);
+  const totalPages = Math.ceil(entries.length / imagesPerPage);
   if (totalPages > 1) {
     const pagination = document.createElement('div');
     pagination.className = 'pagination';
@@ -206,5 +413,6 @@ document.getElementById('modal-close').onclick = () => {
 
 document.getElementById('refresh-images').onclick = fetchImages;
 document.getElementById('date-filter').onchange = fetchImages;
+applyGalleryMode();
 connectWebSocket();
 window.forceRefreshImages = fetchImages;
