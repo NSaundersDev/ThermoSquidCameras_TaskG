@@ -1924,6 +1924,7 @@ restoreCameraSettings('front');
 restoreCameraSettings('back');
 
 const CAMERA_NAMES_KEY = 'thermosquid.cameraNames';
+const SESSION_STORAGE_KEY = 'thermosquid.session';
 const DEFAULT_CAMERA_NAMES = { front: 'Front', back: 'Back' };
 const sessionState = {
   active: false,
@@ -1937,7 +1938,10 @@ const sessionState = {
   delayMs: 0,
   intervalMs: 0,
   imageCount: 1,
+  names: { front: DEFAULT_CAMERA_NAMES.front, back: DEFAULT_CAMERA_NAMES.back },
+  frozenElapsed: 0,
   shotsCancelled: false,
+  pendingShots: [],
   shotTimers: new Set(),
   captureChain: Promise.resolve()
 };
@@ -1982,6 +1986,135 @@ function restoreCameraNames() {
   document.getElementById('back-camera-name').value = typeof stored.back === 'string' && stored.back.trim()
     ? stored.back.trim()
     : DEFAULT_CAMERA_NAMES.back;
+}
+
+function secondsFieldValue(ms) {
+  return String(Number((ms / 1000).toFixed(3)));
+}
+
+function serializeShot(job) {
+  return {
+    inputNumber: job.inputNumber,
+    shotIndex: job.shotIndex,
+    total: job.total,
+    dueAt: job.dueAt,
+    when: job.when instanceof Date ? job.when.getTime() : Number(job.when),
+    sessionName: job.sessionName,
+    names: {
+      front: job.names?.front || DEFAULT_CAMERA_NAMES.front,
+      back: job.names?.back || DEFAULT_CAMERA_NAMES.back
+    }
+  };
+}
+
+function persistSession() {
+  try {
+    const pendingShots = sessionState.pendingShots.map(serializeShot);
+    if (!sessionState.active && !pendingShots.length) {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      return;
+    }
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
+      active: sessionState.active,
+      name: sessionState.name,
+      expected: sessionState.expected,
+      count: sessionState.count,
+      startedAt: sessionState.startedAt,
+      entries: sessionState.entries,
+      queue: sessionState.queue,
+      delayMs: sessionState.delayMs,
+      intervalMs: sessionState.intervalMs,
+      imageCount: sessionState.imageCount,
+      names: sessionState.names,
+      frozenElapsed: sessionState.active ? 0 : sessionState.frozenElapsed,
+      pendingShots
+    }));
+  } catch (error) {
+    console.debug('Session was not stored');
+  }
+}
+
+function savedSessionRecord() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY) || 'null');
+    if (!saved || typeof saved.name !== 'string' || !saved.name.trim()) return null;
+    if (!Number.isInteger(saved.expected) || saved.expected < 1 || saved.expected > 99) return null;
+    if (!Number.isInteger(saved.count) || saved.count < 0 || saved.count > saved.expected) return null;
+    if (!Number.isFinite(saved.startedAt) || saved.startedAt <= 0) return null;
+    if (!Number.isFinite(saved.delayMs) || saved.delayMs < 0 || saved.delayMs > 3600000) return null;
+    if (!Number.isFinite(saved.intervalMs) || saved.intervalMs < 0 || saved.intervalMs > 3600000) return null;
+    if (!Number.isInteger(saved.imageCount) || saved.imageCount < 1 || saved.imageCount > 20) return null;
+    if (!Array.isArray(saved.entries) || !Array.isArray(saved.queue) || !Array.isArray(saved.pendingShots)) return null;
+    if (!saved.active && !saved.pendingShots.length) return null;
+    return saved;
+  } catch (error) {
+    return null;
+  }
+}
+
+function restoreSession() {
+  const saved = savedSessionRecord();
+  if (!saved) {
+    try { localStorage.removeItem(SESSION_STORAGE_KEY); } catch (error) { /* ignore */ }
+    updateSessionControls();
+    return;
+  }
+  sessionState.active = Boolean(saved.active);
+  sessionState.name = saved.name.trim();
+  sessionState.expected = saved.expected;
+  sessionState.count = saved.count;
+  sessionState.startedAt = saved.startedAt;
+  sessionState.delayMs = saved.delayMs;
+  sessionState.intervalMs = saved.intervalMs;
+  sessionState.imageCount = saved.imageCount;
+  sessionState.frozenElapsed = Number.isFinite(saved.frozenElapsed) ? saved.frozenElapsed : 0;
+  sessionState.shotsCancelled = false;
+  sessionState.entries = saved.entries.filter((entry) => (
+    Number.isInteger(entry?.number) && Number.isFinite(entry.elapsed) && Number.isFinite(entry.at)
+  ));
+  sessionState.queue = saved.queue.filter((at) => Number.isFinite(at));
+  sessionState.names = {
+    front: typeof saved.names?.front === 'string' && saved.names.front.trim() ? saved.names.front.trim() : cameraName('front'),
+    back: typeof saved.names?.back === 'string' && saved.names.back.trim() ? saved.names.back.trim() : cameraName('back')
+  };
+  document.getElementById('session-name').value = sessionState.name;
+  document.getElementById('session-input-count').value = String(sessionState.expected);
+  document.getElementById('session-delay').value = secondsFieldValue(sessionState.delayMs);
+  document.getElementById('session-image-count').value = String(sessionState.imageCount);
+  document.getElementById('session-interval').value = secondsFieldValue(sessionState.intervalMs);
+  document.getElementById('front-camera-name').value = sessionState.names.front;
+  document.getElementById('back-camera-name').value = sessionState.names.back;
+  saveCameraNames();
+  renderSessionLog();
+  updateSessionProgress();
+  if (sessionState.active) {
+    setSessionLocked(true);
+    startSessionTimer();
+  } else {
+    setSessionLocked(false);
+    document.getElementById('session-timer').textContent = formatElapsed(sessionState.frozenElapsed);
+  }
+  updateSessionControls();
+  const pending = saved.pendingShots.filter((job) => (
+    Number.isInteger(job?.inputNumber)
+    && Number.isInteger(job.shotIndex)
+    && Number.isInteger(job.total)
+    && Number.isFinite(job.dueAt)
+    && typeof job.sessionName === 'string'
+  ));
+  pending.forEach((job) => scheduleShot({
+    inputNumber: job.inputNumber,
+    shotIndex: job.shotIndex,
+    total: job.total,
+    dueAt: job.dueAt,
+    when: new Date(job.when),
+    sessionName: job.sessionName,
+    names: {
+      front: job.names?.front || sessionState.names.front,
+      back: job.names?.back || sessionState.names.back
+    }
+  }));
+  if (sessionState.active) drainSessionInputs();
 }
 
 function formatElapsed(ms) {
@@ -2114,6 +2247,7 @@ function cancelPendingShots() {
   sessionState.shotsCancelled = true;
   sessionState.shotTimers.forEach((timer) => clearTimeout(timer));
   sessionState.shotTimers.clear();
+  sessionState.pendingShots = [];
 }
 
 function endSession(elapsedMs, cancelShots) {
@@ -2123,9 +2257,11 @@ function endSession(elapsedMs, cancelShots) {
   if (cancelShots) cancelPendingShots();
   stopSessionTimer();
   const elapsed = elapsedMs == null ? Date.now() - sessionState.startedAt : elapsedMs;
+  sessionState.frozenElapsed = elapsed;
   document.getElementById('session-timer').textContent = formatElapsed(elapsed);
   setSessionLocked(false);
   updateSessionControls();
+  persistSession();
 }
 
 function startSession() {
@@ -2146,13 +2282,16 @@ function startSession() {
   sessionState.startedAt = Date.now();
   sessionState.entries = [];
   sessionState.queue = [];
+  sessionState.names = { front: cameraName('front'), back: cameraName('back') };
+  sessionState.frozenElapsed = 0;
   renderSessionLog();
   updateSessionProgress();
   setSessionLocked(true);
   updateSessionControls();
   document.getElementById('session-timer').textContent = '0:00.0';
   startSessionTimer();
-  const names = { front: cameraName('front'), back: cameraName('back') };
+  persistSession();
+  const names = sessionState.names;
   runCapture({
     inputNumber: 0,
     shotIndex: 1,
@@ -2197,9 +2336,14 @@ function runCapture(job) {
 }
 
 function scheduleShot(job) {
+  sessionState.pendingShots.push(job);
+  persistSession();
   const wait = Math.max(0, job.dueAt - Date.now());
   const timer = setTimeout(() => {
     sessionState.shotTimers.delete(timer);
+    const index = sessionState.pendingShots.indexOf(job);
+    if (index >= 0) sessionState.pendingShots.splice(index, 1);
+    persistSession();
     if (sessionState.shotsCancelled) return;
     runCapture(job);
   }, wait);
@@ -2234,6 +2378,7 @@ function drainSessionInputs() {
     scheduleBurst(inputNumber, at);
     if (sessionState.count >= sessionState.expected) endSession(elapsed, false);
   }
+  if (sessionState.active) persistSession();
 }
 
 function initSessionUi() {
@@ -2258,7 +2403,7 @@ function initSessionUi() {
     else startSession();
   });
   document.getElementById('session-input').addEventListener('click', recordSessionInput);
-  updateSessionControls();
+  restoreSession();
 }
 
 initSessionUi();

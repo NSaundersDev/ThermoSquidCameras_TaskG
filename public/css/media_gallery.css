@@ -114,6 +114,12 @@ a.session-card {
   text-align: center;
   font-size: 1.15rem;
 }
+#session-delete {
+  background-color: #8d2b2b;
+}
+#session-delete:hover {
+  background-color: #a33b3b;
+}
 header {
   text-align: center;
 }
