@@ -188,10 +188,6 @@ function drawTimestamp(imageElement, canvas, ctx, door, timestamp, timestampChec
   canvas.width = imgWidth;
   canvas.height = imgHeight;
 
-  // Get the container for positioning the canvas overlay
-  const container = canvas.parentElement;
-  const containerRect = container.getBoundingClientRect();
-
   // Clear canvas and draw the full-resolution image
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(imageElement, 0, 0, imgWidth, imgHeight);
@@ -206,45 +202,16 @@ function drawTimestamp(imageElement, canvas, ctx, door, timestamp, timestampChec
 
   // === RIGHT: Timestamp in WHITE ===
   ctx.textAlign = 'right';
-  ctx.fillStyle = 'white';        // Back to white for timestamp
+  ctx.fillStyle = 'white';
   ctx.strokeStyle = 'black';
-  ctx.size = '1em';
   const dateTime = timeText + "  " + dateText;
-  // Time
   ctx.strokeText(dateTime, canvas.width - 20, 40);
-    ctx.fillText(dateTime, canvas.width - 20, 40);
+  ctx.fillText(dateTime, canvas.width - 20, 40);
 
-
-  // // Date
-  // ctx.strokeText(dateText, canvas.width - 20, 40);
-  // ctx.fillText(dateText, canvas.width - 20, 80);
-
-  // Reset alignment
   ctx.textAlign = 'left';
 
-  // Position the canvas to match the image's display in the container
-  const containerWidth = containerRect.width;
-  const containerHeight = containerRect.height;
-  const containerAspect = containerWidth / containerHeight;
-  const imgAspect = imgWidth / imgHeight;
-
-  let scaleX, scaleY, offsetX, offsetY;
-
-  if (imgAspect > containerAspect) {
-    scaleY = containerHeight / imgHeight;
-    scaleX = scaleY;
-    offsetX = (containerWidth - (imgWidth * scaleX)) / 2;
-    offsetY = 0;
-  } else {
-    scaleX = containerWidth / imgWidth;
-    scaleY = scaleX;
-    offsetX = 0;
-    offsetY = (containerHeight - (imgHeight * scaleY)) / 2;
-  }
-
-  canvas.style.transform = `scale(${scaleX}) translate(${offsetX}px, ${offsetY}px)`;
-  canvas.style.transformOrigin = 'top left';
-
+  // CSS object-fit sizes this canvas the same way as the image underneath.
+  canvas.style.transform = '';
   canvas.style.display = 'block';
   imageElement.style.display = 'none';
 }
