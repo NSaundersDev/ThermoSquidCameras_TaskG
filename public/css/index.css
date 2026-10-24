@@ -212,6 +212,12 @@ body {
 .session-count-field input {
   width: 4.2rem;
 }
+.session-device-field {
+  grid-column: 1 / -1;
+}
+.session-device-field input {
+  width: 11rem;
+}
 .session-btn {
   display: inline-flex;
   align-items: center;

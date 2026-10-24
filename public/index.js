@@ -1925,6 +1925,8 @@ restoreCameraSettings('back');
 
 const CAMERA_NAMES_KEY = 'thermosquid.cameraNames';
 const SESSION_STORAGE_KEY = 'thermosquid.session';
+const NOTIFY_HOST_KEY = 'thermosquid.notifyHost';
+const NOTIFY_PORT = 8080;
 const DEFAULT_CAMERA_NAMES = { front: 'Front', back: 'Back' };
 const sessionState = {
   active: false,
@@ -1945,6 +1947,69 @@ const sessionState = {
   shotTimers: new Set(),
   captureChain: Promise.resolve()
 };
+let notifySocket = null;
+let notifyUrl = '';
+
+function isNotifyHost(value) {
+  const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(value);
+  return Boolean(match && match.slice(1).every((part) => Number(part) <= 255));
+}
+
+function saveNotifyHost() {
+  try {
+    localStorage.setItem(NOTIFY_HOST_KEY, document.getElementById('session-device').value.trim());
+  } catch (error) {
+    console.debug('Device address was not stored');
+  }
+}
+
+function restoreNotifyHost() {
+  try {
+    const stored = localStorage.getItem(NOTIFY_HOST_KEY);
+    if (typeof stored === 'string') document.getElementById('session-device').value = stored;
+  } catch (error) {
+    console.debug('Device address was not restored');
+  }
+}
+
+function notifyShot(count) {
+  const host = document.getElementById('session-device').value.trim();
+  if (!host) return;
+  if (!isNotifyHost(host)) {
+    showStatusMessage('Device IP is not valid', 2000);
+    return;
+  }
+  const url = `ws://${host}:${NOTIFY_PORT}`;
+  const payload = JSON.stringify({ shot: count });
+  if (!notifySocket || notifyUrl !== url || notifySocket.readyState === WebSocket.CLOSING || notifySocket.readyState === WebSocket.CLOSED) {
+    try {
+      if (notifySocket && notifySocket.readyState !== WebSocket.CLOSED) notifySocket.close();
+    } catch (error) {
+      console.debug('Device socket was already closed');
+    }
+    try {
+      notifySocket = new WebSocket(url);
+      notifyUrl = url;
+    } catch (error) {
+      notifySocket = null;
+      notifyUrl = '';
+      showStatusMessage('Could not reach the device', 2000);
+      return;
+    }
+    const socket = notifySocket;
+    socket.addEventListener('error', () => {
+      if (notifySocket === socket) showStatusMessage('Could not reach the device', 2000);
+    });
+  }
+  const socket = notifySocket;
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(payload);
+    return;
+  }
+  socket.addEventListener('open', () => {
+    if (notifySocket === socket && socket.readyState === WebSocket.OPEN) socket.send(payload);
+  }, { once: true });
+}
 
 function fileToken(value, fallback) {
   const cleaned = String(value || '')
@@ -2375,6 +2440,7 @@ function drainSessionInputs() {
     sessionState.entries.push({ number: inputNumber, elapsed, at });
     renderSessionLog();
     updateSessionProgress();
+    notifyShot(inputNumber);
     scheduleBurst(inputNumber, at);
     if (sessionState.count >= sessionState.expected) endSession(elapsed, false);
   }
@@ -2383,6 +2449,10 @@ function drainSessionInputs() {
 
 function initSessionUi() {
   restoreCameraNames();
+  restoreNotifyHost();
+  const device = document.getElementById('session-device');
+  device.addEventListener('input', saveNotifyHost);
+  device.addEventListener('change', saveNotifyHost);
   ['front', 'back'].forEach((door) => {
     const input = document.getElementById(`${door}-camera-name`);
     input.addEventListener('input', saveCameraNames);
