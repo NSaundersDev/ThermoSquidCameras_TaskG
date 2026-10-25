@@ -552,6 +552,13 @@ function connectImageWebSocket() {
   imageWs.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
+      if (data.action === 'notify_device') {
+        if (data.status === 'error') {
+          const message = data.message === 'Device IP is not valid' ? data.message : 'Could not reach the device';
+          showStatusMessage(message, 2000);
+        }
+        return;
+      }
       const door = data.door;
       if (door !== 'front' && door !== 'back') return;
       if (data.action && data.action !== 'save_image') return;
@@ -1926,7 +1933,6 @@ restoreCameraSettings('back');
 const CAMERA_NAMES_KEY = 'thermosquid.cameraNames';
 const SESSION_STORAGE_KEY = 'thermosquid.session';
 const NOTIFY_HOST_KEY = 'thermosquid.notifyHost';
-const NOTIFY_PORT = 8080;
 const DEFAULT_CAMERA_NAMES = { front: 'Front', back: 'Back' };
 const sessionState = {
   active: false,
@@ -1947,9 +1953,6 @@ const sessionState = {
   shotTimers: new Set(),
   captureChain: Promise.resolve()
 };
-let notifySocket = null;
-let notifyUrl = '';
-
 function isNotifyHost(value) {
   const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(value);
   return Boolean(match && match.slice(1).every((part) => Number(part) <= 255));
@@ -1973,42 +1976,17 @@ function restoreNotifyHost() {
 }
 
 function notifyShot(count) {
-  const host = document.getElementById('session-device').value.trim();
-  if (!host) return;
-  if (!isNotifyHost(host)) {
+  const deviceHost = document.getElementById('session-device').value.trim();
+  if (!deviceHost) return;
+  if (!isNotifyHost(deviceHost)) {
     showStatusMessage('Device IP is not valid', 2000);
     return;
   }
-  const url = `ws://${host}:${NOTIFY_PORT}`;
-  const payload = JSON.stringify({ shot: count });
-  if (!notifySocket || notifyUrl !== url || notifySocket.readyState === WebSocket.CLOSING || notifySocket.readyState === WebSocket.CLOSED) {
-    try {
-      if (notifySocket && notifySocket.readyState !== WebSocket.CLOSED) notifySocket.close();
-    } catch (error) {
-      console.debug('Device socket was already closed');
-    }
-    try {
-      notifySocket = new WebSocket(url);
-      notifyUrl = url;
-    } catch (error) {
-      notifySocket = null;
-      notifyUrl = '';
-      showStatusMessage('Could not reach the device', 2000);
-      return;
-    }
-    const socket = notifySocket;
-    socket.addEventListener('error', () => {
-      if (notifySocket === socket) showStatusMessage('Could not reach the device', 2000);
-    });
-  }
-  const socket = notifySocket;
-  if (socket.readyState === WebSocket.OPEN) {
-    socket.send(payload);
+  if (!imageWs || imageWs.readyState !== WebSocket.OPEN) {
+    showStatusMessage('Image service is not connected', 2000);
     return;
   }
-  socket.addEventListener('open', () => {
-    if (notifySocket === socket && socket.readyState === WebSocket.OPEN) socket.send(payload);
-  }, { once: true });
+  imageWs.send(JSON.stringify({ action: 'notify_device', host: deviceHost, shot: count }));
 }
 
 function fileToken(value, fallback) {
