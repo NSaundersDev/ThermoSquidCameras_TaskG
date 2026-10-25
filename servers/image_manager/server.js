@@ -5,6 +5,7 @@ const path = require('path');
 const archiver = require('archiver');
 const { spawn } = require('child_process');
 const { notifyDevice } = require('./notify_device');
+const { sessionDataStoredName, isSessionDataFile } = require('./session_data');
 
 const repoRoot = path.resolve(__dirname, '../..');
 const baseDir = path.join(repoRoot, 'public', 'images');
@@ -53,62 +54,62 @@ async function ensureDir(door, date) {
 }
 
 
+async function appendListedFiles(results, door, dateFilter, includeFile) {
+  const doorPath = path.join(baseDir, door);
+  let dateDirs = [];
+  try {
+    dateDirs = await fs.readdir(doorPath);
+  } catch {
+    return;
+  }
+
+  for (const dateDir of dateDirs) {
+    if (dateFilter && dateDir !== dateFilter) continue;
+
+    const fullDatePath = path.join(doorPath, dateDir);
+    let files = [];
+    try {
+      files = await fs.readdir(fullDatePath);
+    } catch {
+      continue;
+    }
+
+    for (const file of files) {
+      if (!includeFile(file)) continue;
+
+      const fullPath = path.join(fullDatePath, file);
+      let timestamp;
+      try {
+        const stats = await fs.stat(fullPath);
+        timestamp = stats.mtimeMs;
+      } catch {
+        const match = file.match(/^(\d+)-/);
+        timestamp = match ? parseInt(match[1], 10) : Date.now();
+      }
+      if (isNaN(timestamp)) continue;
+
+      results.push({
+        door,
+        timestamp,
+        path: `/images/${door}/${dateDir}/${file}`,
+        name: file,
+        type: isSessionDataFile(file) ? 'data' : 'image'
+      });
+    }
+  }
+}
+
 async function listImages(doorFilter = null, dateFilter = null) {
   const results = [];
-
-  // === IMAGES from baseDir (front/back) - using actual file mtime ===
   const doorsToScan = (doorFilter && ['front', 'back'].includes(doorFilter))
     ? [doorFilter]
     : ['front', 'back'];
 
   for (const door of doorsToScan) {
-    const doorPath = path.join(baseDir, door);
-
-    let dateDirs = [];
-    try {
-      dateDirs = await fs.readdir(doorPath);
-    } catch {
-      continue;
-    }
-
-    for (const dateDir of dateDirs) {
-      if (dateFilter && dateDir !== dateFilter) continue;
-
-      const fullDatePath = path.join(doorPath, dateDir);
-      let files = [];
-      try {
-        files = await fs.readdir(fullDatePath);
-      } catch {
-        continue;
-      }
-
-      for (const file of files) {
-        if (!file.match(/\.(jpg|jpeg|png)$/i)) continue;
-
-        const fullPath = path.join(fullDatePath, file);
-
-        // Use actual file modification time
-        let timestamp;
-        try {
-          const stats = await fs.stat(fullPath);
-          timestamp = stats.mtimeMs;
-        } catch {
-          // Fallback to filename if stat fails
-          const match = file.match(/^(\d+)-/);
-          timestamp = match ? parseInt(match[1], 10) : Date.now();
-        }
-
-        if (isNaN(timestamp)) continue;
-
-        results.push({
-          door: door,
-          timestamp,
-          path: `/images/${door}/${dateDir}/${file}`,
-          name: file,
-          type: 'image'
-        });
-      }
-    }
+    await appendListedFiles(results, door, dateFilter, (file) => /\.(jpg|jpeg|png)$/i.test(file));
+  }
+  if (!doorFilter || doorFilter === 'all' || doorFilter === 'data') {
+    await appendListedFiles(results, 'data', dateFilter, (file) => isSessionDataFile(file));
   }
 
   return results.sort((a, b) => b.timestamp - a.timestamp);
@@ -171,6 +172,35 @@ wss.on('connection', (ws) => {
         wss.clients.forEach(client => {
           if (client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify({ status: 'image_list', door, date, images }));
+          }
+        });
+      } else if (data.action === 'save_session_data') {
+        const storedName = sessionDataStoredName(data.fileName);
+        const csv = typeof data.csv === 'string' ? data.csv : '';
+        if (!storedName) {
+          ws.send(JSON.stringify({ status: 'error', action: 'save_session_data', message: 'Invalid file name' }));
+          return;
+        }
+        if (!csv || csv.length > 1000000) {
+          ws.send(JSON.stringify({ status: 'error', action: 'save_session_data', message: 'Shot data was empty' }));
+          return;
+        }
+        const date = new Date().toISOString().split('T')[0];
+        const dir = await ensureDir('data', date);
+        const filename = path.join(dir, storedName);
+        try {
+          await fs.writeFile(filename, csv, 'utf8');
+        } catch (err) {
+          console.error('Error writing shot data:', err);
+          ws.send(JSON.stringify({ status: 'error', action: 'save_session_data', message: 'Could not save the shot data' }));
+          return;
+        }
+        const imagePath = `/images/data/${date}/${storedName}`;
+        ws.send(JSON.stringify({ status: 'saved', action: 'save_session_data', path: imagePath, filename: storedName }));
+        const images = await listImages();
+        wss.clients.forEach(client => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({ status: 'image_list', door: 'all', images }));
           }
         });
       } else if (data.action === 'delete_image') {
@@ -259,7 +289,9 @@ wss.on('connection', (ws) => {
       } else if (data.action === 'list_images') {
         const { door, date } = data;
         const images = await listImages(door || 'all', date);
-        ws.send(JSON.stringify({ status: 'image_list', door: door || 'all', date, images }));
+        const reply = { status: 'image_list', door: door || 'all', date, images };
+        if (typeof data.requestId === 'string' && data.requestId.length <= 80) reply.requestId = data.requestId;
+        ws.send(JSON.stringify(reply));
       } else if (data.action === 'notify_device') {
         const host = typeof data.host === 'string' ? data.host.trim() : '';
         const notifyErrors = {

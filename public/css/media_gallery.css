@@ -83,6 +83,20 @@ main {
   border-radius: 4px;
   cursor: pointer;
 }
+.data-file {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100px;
+  border-radius: 4px;
+  background: #13283f;
+  color: #b9dcff;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.data-card .download {
+  margin-top: 0.6rem;
+}
 a.session-card {
   display: block;
   color: inherit;

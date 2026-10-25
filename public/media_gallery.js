@@ -1,3 +1,5 @@
+import { zipStored } from './session_pack.js';
+
 let ws = null;
 let currentImages = [];
 let currentPage = 1;
@@ -126,6 +128,16 @@ function imageBaseName(fileName) {
   return String(fileName).replace(/\.(jpe?g|png)$/i, '');
 }
 
+function parseSessionDataFile(fileName) {
+  const match = String(fileName || '').match(/^(\d{6})--([A-Za-z0-9][A-Za-z0-9_-]{0,80})--shot-data\.csv$/i);
+  if (!match) return null;
+  return {
+    date: match[1],
+    session: match[2],
+    key: `${match[1]}--${match[2]}`
+  };
+}
+
 function parseModernSession(fileName) {
   const match = imageBaseName(fileName).match(/^(\d{6})--(.+?)--(.+?)--(\d{2})(?:--(\d{2}))?$/);
   if (!match) return null;
@@ -219,6 +231,13 @@ function classifyImages(images) {
   const legacy = [];
   images.forEach((img) => {
     const name = imageFileName(img);
+    const dataFile = parseSessionDataFile(name);
+    if (dataFile) {
+      const group = modern.get(dataFile.key) || { key: dataFile.key, date: dataFile.date, session: dataFile.session, images: [] };
+      group.dataFile = { ...img, parsed: dataFile };
+      modern.set(dataFile.key, group);
+      return;
+    }
     const parsed = parseModernSession(name);
     if (parsed) {
       const copy = { ...img, parsed };
@@ -279,81 +298,6 @@ function sessionZipName() {
   return (selectedSessionKey() || 'session').replace(/[^\w.-]+/g, '-');
 }
 
-const CRC_TABLE = new Uint32Array(256);
-for (let n = 0; n < 256; n += 1) {
-  let crc = n;
-  for (let k = 0; k < 8; k += 1) crc = crc & 1 ? 0xedb88320 ^ (crc >>> 1) : crc >>> 1;
-  CRC_TABLE[n] = crc >>> 0;
-}
-
-function crc32(data) {
-  let crc = 0xffffffff;
-  for (let i = 0; i < data.length; i += 1) crc = CRC_TABLE[(crc ^ data[i]) & 0xff] ^ (crc >>> 8);
-  return (crc ^ 0xffffffff) >>> 0;
-}
-
-function concatBytes(parts) {
-  const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
-  let pos = 0;
-  parts.forEach((part) => {
-    out.set(part, pos);
-    pos += part.length;
-  });
-  return out;
-}
-
-function zipStored(files) {
-  const now = new Date();
-  const time = (now.getHours() << 11) | (now.getMinutes() << 5) | Math.floor(now.getSeconds() / 2);
-  const day = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
-  const parts = [];
-  const centrals = [];
-  let offset = 0;
-  files.forEach((file) => {
-    const nameBytes = new TextEncoder().encode(file.name);
-    const crc = crc32(file.data);
-    const local = new Uint8Array(30 + nameBytes.length);
-    const view = new DataView(local.buffer);
-    view.setUint32(0, 0x04034b50, true);
-    view.setUint16(4, 20, true);
-    view.setUint16(6, 0x800, true);
-    view.setUint16(8, 0, true);
-    view.setUint16(10, time, true);
-    view.setUint16(12, day, true);
-    view.setUint32(14, crc, true);
-    view.setUint32(18, file.data.length, true);
-    view.setUint32(22, file.data.length, true);
-    view.setUint16(26, nameBytes.length, true);
-    local.set(nameBytes, 30);
-    parts.push(local, file.data);
-    const central = new Uint8Array(46 + nameBytes.length);
-    const centralView = new DataView(central.buffer);
-    centralView.setUint32(0, 0x02014b50, true);
-    centralView.setUint16(4, 20, true);
-    centralView.setUint16(6, 20, true);
-    centralView.setUint16(8, 0x800, true);
-    centralView.setUint16(12, time, true);
-    centralView.setUint16(14, day, true);
-    centralView.setUint32(16, crc, true);
-    centralView.setUint32(20, file.data.length, true);
-    centralView.setUint32(24, file.data.length, true);
-    centralView.setUint16(28, nameBytes.length, true);
-    centralView.setUint32(42, offset, true);
-    central.set(nameBytes, 46);
-    centrals.push(central);
-    offset += local.length + file.data.length;
-  });
-  const centralSize = centrals.reduce((sum, part) => sum + part.length, 0);
-  const end = new Uint8Array(22);
-  const endView = new DataView(end.buffer);
-  endView.setUint32(0, 0x06054b50, true);
-  endView.setUint16(8, files.length, true);
-  endView.setUint16(10, files.length, true);
-  endView.setUint32(12, centralSize, true);
-  endView.setUint32(16, offset, true);
-  return concatBytes([...parts, ...centrals, end]);
-}
-
 async function downloadSessionImages() {
   const images = sessionImages();
   const button = document.getElementById('session-download');
@@ -397,8 +341,13 @@ function deleteSessionImages() {
     showStatus('No images in this session', 3000, true);
     return;
   }
+  const dataCount = images.filter((img) => parseSessionDataFile(imageFileName(img))).length;
+  const imageCount = images.length - dataCount;
   const name = sessionHeading(selectedSessionKey()).split(' · ')[0] || 'this session';
-  if (!window.confirm(`Delete all ${images.length} images in ${name}?`)) return;
+  let prompt = `Delete all ${imageCount} images in ${name}?`;
+  if (imageCount && dataCount) prompt = `Delete all ${imageCount} images and the data file in ${name}?`;
+  else if (dataCount) prompt = `Delete the data file in ${name}?`;
+  if (!window.confirm(prompt)) return;
   if (!ws || ws.readyState !== WebSocket.OPEN) {
     showStatus('Image service is not connected', 4000, true);
     return;
@@ -424,7 +373,9 @@ function compareSessionImages(a, b) {
 }
 
 function entryTime(entry) {
-  const images = entry.type === 'session' ? entry.group.images : [entry.img];
+  const images = entry.type === 'session'
+    ? entry.group.images.concat(entry.group.dataFile ? [entry.group.dataFile] : [])
+    : [entry.img];
   return Math.max(...images.map((img) => Number(img.timestamp) || 0));
 }
 
@@ -433,7 +384,10 @@ function galleryEntries(images) {
   const classified = classifyImages(images);
   if (key) {
     const group = classified.groups.find((item) => item.key === key);
-    return (group ? group.images : []).sort(compareSessionImages).map((img) => ({ type: 'image', img }));
+    if (!group) return [];
+    const entries = group.images.slice().sort(compareSessionImages).map((img) => ({ type: 'image', img }));
+    if (group.dataFile) entries.unshift({ type: 'data', img: group.dataFile });
+    return entries;
   }
   const entries = [
     ...classified.groups.map((group) => ({ type: 'session', group })),
@@ -461,15 +415,35 @@ function renderImageCard(img) {
   return card;
 }
 
+function renderDataCard(file) {
+  const card = document.createElement('div');
+  card.className = 'image-card data-card';
+  const fileName = imageFileName(file);
+  card.innerHTML = `
+    <div class="data-file">CSV</div>
+    <p class="file-name">${fileNameHtml(fileName)}</p>
+    <p class="image-time">${new Date(file.timestamp).toLocaleString()}</p>
+    <button class="download" type="button">Download</button>
+  `;
+  card.querySelector('.download').onclick = () => downloadFile(file.path);
+  return card;
+}
+
 function renderSessionCard(group) {
-  const preview = [...group.images].sort(compareSessionImages)[0];
+  const preview = group.images.length ? [...group.images].sort(compareSessionImages)[0] : null;
   const link = document.createElement('a');
   link.className = 'image-card session-card';
   link.href = `media_gallery.html?session=${encodeURIComponent(group.key)}`;
+  const visual = preview
+    ? `<img src="${escapeHtml(preview.path)}" alt="${escapeHtml(group.session)}" loading="lazy">`
+    : '<div class="data-file" aria-hidden="true">CSV</div>';
+  const meta = group.images.length
+    ? `${formatSessionDate(group.date)} · ${group.images.length} images`
+    : `${formatSessionDate(group.date)} · Data file`;
   link.innerHTML = `
-    <img src="${escapeHtml(preview.path)}" alt="${escapeHtml(group.session)}" loading="lazy">
+    ${visual}
     <p class="session-title">${escapeHtml(group.session)}</p>
-    <p class="session-meta">${escapeHtml(formatSessionDate(group.date))} · ${group.images.length} images</p>
+    <p class="session-meta">${escapeHtml(meta)}</p>
   `;
   return link;
 }
@@ -494,7 +468,9 @@ function renderImages() {
   const pageItems = entries.slice(start, end);
 
   pageItems.forEach((entry) => {
-    grid.appendChild(entry.type === 'session' ? renderSessionCard(entry.group) : renderImageCard(entry.img));
+    if (entry.type === 'session') grid.appendChild(renderSessionCard(entry.group));
+    else if (entry.type === 'data') grid.appendChild(renderDataCard(entry.img));
+    else grid.appendChild(renderImageCard(entry.img));
   });
 
   const totalPages = Math.ceil(entries.length / imagesPerPage);

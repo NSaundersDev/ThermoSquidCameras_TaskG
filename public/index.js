@@ -1,3 +1,5 @@
+import { zipStored } from './session_pack.js';
+
 const host = window.location.hostname;
 // WebSockets
 let frontCameraWs = new WebSocket(`ws://${host}:8081/ws`);
@@ -545,6 +547,31 @@ function connectCameraWebSocket(camera, ws, videoStream, canvas, ctx, timestampC
   };
 }
 
+let imageListWaiter = null;
+let imageListSeq = 0;
+
+function requestImageList() {
+  return new Promise((resolve, reject) => {
+    if (!imageWs || imageWs.readyState !== WebSocket.OPEN) {
+      reject(new Error('closed'));
+      return;
+    }
+    if (imageListWaiter) {
+      clearTimeout(imageListWaiter.timer);
+      imageListWaiter.reject(new Error('replaced'));
+      imageListWaiter = null;
+    }
+    const id = `list-${Date.now()}-${imageListSeq += 1}`;
+    const timer = setTimeout(() => {
+      if (!imageListWaiter || imageListWaiter.id !== id) return;
+      imageListWaiter = null;
+      reject(new Error('timeout'));
+    }, 8000);
+    imageListWaiter = { id, resolve, reject, timer };
+    imageWs.send(JSON.stringify({ action: 'list_images', door: null, date: null, requestId: id }));
+  });
+}
+
 function connectImageWebSocket() {
   imageWs.onopen = () => {
     console.log('Image service connected');
@@ -552,6 +579,19 @@ function connectImageWebSocket() {
   imageWs.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
+      if (data.status === 'image_list') {
+        if (imageListWaiter && data.requestId === imageListWaiter.id) {
+          const waiter = imageListWaiter;
+          imageListWaiter = null;
+          clearTimeout(waiter.timer);
+          waiter.resolve(Array.isArray(data.images) ? data.images : []);
+        }
+        return;
+      }
+      if (data.action === 'save_session_data') {
+        if (data.status === 'error') showStatusMessage(data.message || 'Could not save the shot data', 2000);
+        return;
+      }
       if (data.action === 'notify_device') {
         if (data.status === 'error') {
           showStatusMessage(notifyStatusText(data.message), 2000);
@@ -1956,7 +1996,9 @@ const sessionState = {
   shotsCancelled: false,
   pendingShots: [],
   shotTimers: new Set(),
-  captureChain: Promise.resolve()
+  captureChain: Promise.resolve(),
+  exportColumns: null,
+  dataCsv: ''
 };
 function isNotifyHost(value) {
   const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(value);
@@ -2020,6 +2062,8 @@ function formatShotTemperature(value) {
   return Number(value).toFixed(1);
 }
 
+const MISSING_TEMPERATURE = '\u2014';
+
 function storedThermocouples() {
   try {
     const saved = JSON.parse(localStorage.getItem(THERMOCOUPLE_KEY) || '[]');
@@ -2081,6 +2125,7 @@ function applyShotReading(shot, at, temperatures) {
   renderThermocoupleChoices();
   renderSessionLog();
   persistSession();
+  if (!sessionState.active && sessionState.exportColumns) saveSessionDataFile();
   return true;
 }
 
@@ -2329,7 +2374,7 @@ function updateSessionControls() {
   exportData.disabled = !canExport;
   exportData.title = active
     ? 'Available after the session ends'
-    : (canExport ? 'Download the shot table' : 'No shot data to export');
+    : (canExport ? 'Download the session images and shot data' : 'No shot data to export');
   const start = document.getElementById('session-start');
   const icon = start.querySelector('i');
   const label = start.querySelector('span');
@@ -2397,7 +2442,7 @@ function renderSessionLog() {
       const temp = document.createElement('td');
       temp.className = 'session-log-temp';
       const value = Array.isArray(temperatures) ? temperatures[index - 1] : null;
-      temp.textContent = Number.isFinite(value) ? `${formatShotTemperature(value)}°C` : '—';
+      temp.textContent = Number.isFinite(value) ? `${formatShotTemperature(value)}°C` : MISSING_TEMPERATURE;
       row.append(temp);
     });
     body.append(row);
@@ -2419,27 +2464,142 @@ function sessionStartedLabel() {
   return `Session started ${stamp}`;
 }
 
-function exportSessionData() {
-  if (sessionState.active || !sessionState.entries.length) return;
-  const table = document.querySelector('#session-log table');
-  if (!table) return;
-  const headers = [...table.querySelectorAll('thead th')].map((cell) => cell.textContent);
-  headers.push(sessionStartedLabel());
+function buildSessionCsv() {
+  if (!sessionState.entries.length || !sessionState.startedAt) return '';
+  const columns = sessionState.exportColumns || selectedThermocoupleIndexes();
+  const headers = ['Shot', 'Time', ...columns.map((index) => `TC${index}`), sessionStartedLabel()];
   const rows = [headers];
-  table.querySelectorAll('tbody tr').forEach((row) => {
-    rows.push([...row.children].map((cell) => (
-      cell.classList.contains('session-log-temp') ? cell.textContent.replace(/°C$/, '') : cell.textContent
-    )));
+  sessionState.entries.forEach((entry) => {
+    const temperatures = entry.reading && entry.reading.temperatures;
+    rows.push([
+      String(entry.number).padStart(2, '0'),
+      formatElapsed(entry.elapsed),
+      ...columns.map((index) => {
+        const value = Array.isArray(temperatures) ? temperatures[index - 1] : null;
+        return Number.isFinite(value) ? formatShotTemperature(value) : MISSING_TEMPERATURE;
+      })
+    ]);
   });
-  const csv = `\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}`;
-  const link = document.createElement('a');
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  link.href = url;
-  link.download = `${fileToken(sessionState.name, 'session')}-shots.csv`;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return `\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}`;
+}
+
+function sessionDataIdentity() {
+  const when = new Date(sessionState.startedAt);
+  const datePart = `${String(when.getMonth() + 1).padStart(2, '0')}${String(when.getDate()).padStart(2, '0')}${String(when.getFullYear()).slice(-2)}`;
+  const cameraLabel = sessionState.names && sessionState.names.front
+    ? sessionState.names.front
+    : DEFAULT_CAMERA_NAMES.front;
+  const sample = sessionImageBaseName(sessionState.name, cameraLabel, 1, when, 1, 1);
+  const prefix = `${datePart}--`;
+  let sessionToken = fileToken(sessionState.name, 'Session');
+  if (sample.startsWith(prefix) && sample.endsWith('--01')) {
+    const middle = sample.slice(prefix.length, sample.length - 4);
+    const splitAt = middle.lastIndexOf('--');
+    if (splitAt > 0) sessionToken = middle.slice(0, splitAt);
+  }
+  return {
+    key: `${datePart}--${sessionToken}`,
+    fileBase: `${datePart}--${sessionToken}--shot-data`
+  };
+}
+
+function saveSessionDataFile() {
+  if (!sessionState.entries.length) return;
+  const csv = buildSessionCsv();
+  if (!csv) return;
+  sessionState.dataCsv = csv;
+  const { fileBase } = sessionDataIdentity();
+  if (!imageWs || imageWs.readyState !== WebSocket.OPEN) {
+    showStatusMessage('Image service is not connected', 2000);
+    return;
+  }
+  imageWs.send(JSON.stringify({
+    action: 'save_session_data',
+    fileName: fileBase,
+    csv
+  }));
+}
+
+function listedFileName(img) {
+  if (img && img.name) return String(img.name);
+  const imagePath = String(img && img.path || '');
+  return decodeURIComponent(imagePath.split('/').pop() || imagePath);
+}
+
+function listedSessionKey(fileName) {
+  const base = String(fileName).replace(/\.(jpe?g|png)$/i, '');
+  const match = base.match(/^(\d{6})--(.+?)--(.+?)--(\d{2})(?:--(\d{2}))?$/);
+  if (!match) return '';
+  return `${match[1]}--${match[2]}`;
+}
+
+function compareListedImages(a, b) {
+  const rank = (img) => {
+    const base = listedFileName(img).replace(/\.(jpe?g|png)$/i, '');
+    const match = base.match(/^(\d{6})--(.+?)--(.+?)--(\d{2})(?:--(\d{2}))?$/);
+    return {
+      count: match ? match[4] : '99',
+      shot: match && match[5] ? match[5] : ''
+    };
+  };
+  const left = rank(a);
+  const right = rank(b);
+  const count = left.count.localeCompare(right.count);
+  if (count) return count;
+  const shot = left.shot.localeCompare(right.shot);
+  if (shot) return shot;
+  if (a.door === b.door) return 0;
+  return a.door === 'front' ? -1 : 1;
+}
+
+async function exportSessionData() {
+  if (sessionState.active || !sessionState.entries.length) return;
+  const button = document.getElementById('session-export');
+  if (!imageWs || imageWs.readyState !== WebSocket.OPEN) {
+    showStatusMessage('Image service is not connected', 2000);
+    return;
+  }
+  if (button) button.disabled = true;
+  try {
+    const listed = await requestImageList();
+    const { key, fileBase } = sessionDataIdentity();
+    const dataName = `${fileBase}.csv`;
+    const photos = listed.filter((img) => {
+      const name = listedFileName(img);
+      return /\.(jpe?g|png)$/i.test(name) && listedSessionKey(name) === key;
+    }).sort(compareListedImages);
+    const saved = listed.find((img) => listedFileName(img).toLowerCase() === dataName.toLowerCase());
+    let csvBytes = null;
+    if (saved && saved.path) {
+      const response = await fetch(saved.path);
+      if (response.ok) csvBytes = new Uint8Array(await response.arrayBuffer());
+    }
+    if (!csvBytes && sessionState.dataCsv) csvBytes = new TextEncoder().encode(sessionState.dataCsv);
+    if (!csvBytes) throw new Error('missing data');
+    const used = new Set([dataName]);
+    const files = [{ name: dataName, data: csvBytes }];
+    for (const img of photos) {
+      const response = await fetch(img.path);
+      if (!response.ok) throw new Error(listedFileName(img));
+      let name = listedFileName(img);
+      if (used.has(name)) name = `${img.door || 'image'}-${name}`;
+      used.add(name);
+      files.push({ name, data: new Uint8Array(await response.arrayBuffer()) });
+    }
+    const blob = new Blob([zipStored(files)], { type: 'application/zip' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${key}.zip`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  } catch (error) {
+    showStatusMessage('Could not export the session', 2000);
+  } finally {
+    updateSessionControls();
+  }
 }
 
 function stopSessionTimer() {
@@ -2476,6 +2636,10 @@ function endSession(elapsedMs, cancelShots) {
   setSessionLocked(false);
   updateSessionControls();
   persistSession();
+  if (sessionState.entries.length) {
+    sessionState.exportColumns = selectedThermocoupleIndexes().slice();
+    saveSessionDataFile();
+  }
 }
 
 function startSession() {
@@ -2496,6 +2660,8 @@ function startSession() {
   sessionState.startedAt = Date.now();
   sessionState.entries = [];
   sessionState.queue = [];
+  sessionState.exportColumns = null;
+  sessionState.dataCsv = '';
   sessionState.names = { front: cameraName('front'), back: cameraName('back') };
   sessionState.frozenElapsed = 0;
   renderSessionLog();
