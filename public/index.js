@@ -1350,6 +1350,51 @@ function getLocalWindowsTime() {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 let timeWs = null;
+let timeSyncPending = false;
+let timeSyncTimer = null;
+
+function showTimeSyncStatus(text, kind) {
+  const status = document.getElementById('time-sync-status');
+  if (!status) return;
+  const icon = status.querySelector('i');
+  const label = status.querySelector('span');
+  status.hidden = !text;
+  status.classList.toggle('is-success', kind === 'success');
+  status.classList.toggle('is-error', kind === 'error');
+  status.classList.toggle('is-pending', kind === 'pending');
+  if (icon) {
+    icon.className = kind === 'success'
+      ? 'fa-solid fa-check'
+      : kind === 'error'
+        ? 'fa-solid fa-triangle-exclamation'
+        : 'fa-solid fa-clock';
+  }
+  if (label) label.textContent = text || '';
+}
+
+function setSyncButtonBusy(busy) {
+  const button = document.getElementById('sync-time-btn');
+  if (!button) return;
+  button.disabled = busy;
+  const label = button.querySelector('span');
+  if (label) label.textContent = busy ? 'Syncing...' : 'Sync time';
+}
+
+function finishTimeSync(text, kind) {
+  timeSyncPending = false;
+  clearTimeout(timeSyncTimer);
+  timeSyncTimer = null;
+  setSyncButtonBusy(false);
+  showTimeSyncStatus(text, kind);
+}
+
+function timeSyncSuccessText(message) {
+  const text = typeof message === 'string' ? message.trim() : '';
+  const match = text.match(/set to\s+(.+)$/i);
+  if (match) return `Synced to ${match[1].trim()}`;
+  return text || 'Time synced';
+}
+
 function connectTimeServer() {
   // This is the important line - it uses whatever hostname/IP the page was loaded from
   const host = window.location.hostname;
@@ -1367,17 +1412,17 @@ function connectTimeServer() {
       const data = JSON.parse(event.data);
 
       if (data.type === 'success') {
-        alert("✅ Time Sync Successful!\n\n" + data.message);
-      }
-
-      if (data.type === 'error') {
-        alert("❌ Time Sync Failed:\n" + data.message);
+        finishTimeSync(timeSyncSuccessText(data.message), 'success');
+      } else if (data.type === 'error') {
+        const message = typeof data.message === 'string' ? data.message.trim() : '';
+        finishTimeSync(message || 'Time sync failed', 'error');
       }
     } catch (e) {}
   };
 
   timeWs.onclose = () => {
     console.log('%c[Time] Disconnected from time server', 'color: red');
+    if (timeSyncPending) finishTimeSync('Time server not connected', 'error');
     // Auto-reconnect
     setTimeout(connectTimeServer, 5000);
   };
@@ -1396,22 +1441,29 @@ const syncTimeBtn = document.getElementById('sync-time-btn');
 if (syncTimeBtn) {
   syncTimeBtn.addEventListener('click', () => {
     if (!timeWs || timeWs.readyState !== WebSocket.OPEN) {
-      if (typeof showStatusMessage === 'function') {
-        showStatusMessage('Time server not connected', 2500);
-      }
+      finishTimeSync('Time server not connected', 'error');
       return;
     }
+    if (timeSyncPending) return;
 
     const localTime = getLocalWindowsTime();
+    timeSyncPending = true;
+    setSyncButtonBusy(true);
+    showTimeSyncStatus('Syncing Pi time...', 'pending');
+    clearTimeout(timeSyncTimer);
+    timeSyncTimer = setTimeout(() => {
+      if (!timeSyncPending) return;
+      finishTimeSync('No reply from the time server', 'error');
+    }, 8000);
 
-    timeWs.send(JSON.stringify({
-      type: 'sync-time',
-      time: localTime,           // ← Send formatted local time
-      password: 'Lasers4Life'
-    }));
-
-    if (typeof showStatusMessage === 'function') {
-      showStatusMessage('Syncing server time...', 2000);
+    try {
+      timeWs.send(JSON.stringify({
+        type: 'sync-time',
+        time: localTime,
+        password: 'Lasers4Life'
+      }));
+    } catch (err) {
+      finishTimeSync('Time server not connected', 'error');
     }
   });
 }
@@ -1998,7 +2050,8 @@ const sessionState = {
   shotTimers: new Set(),
   captureChain: Promise.resolve(),
   exportColumns: null,
-  dataCsv: ''
+  dataCsv: '',
+  dismissed: false
 };
 function isNotifyHost(value) {
   const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(value);
@@ -2192,6 +2245,10 @@ function serializeShot(job) {
 
 function persistSession() {
   try {
+    if (sessionState.dismissed) {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      return;
+    }
     const pendingShots = sessionState.pendingShots.map(serializeShot);
     if (!sessionState.active && !pendingShots.length) {
       localStorage.removeItem(SESSION_STORAGE_KEY);
@@ -2369,6 +2426,14 @@ function updateSessionControls() {
   document.getElementById('session-input').hidden = !active;
   document.getElementById('session-live').hidden = !started;
   document.getElementById('session-side').hidden = !started;
+  const finished = started && !active;
+  const archiveButton = document.getElementById('session-archive');
+  const deleteButton = document.getElementById('session-delete');
+  archiveButton.hidden = !finished;
+  deleteButton.hidden = !finished;
+  archiveButton.title = finished ? 'Keep the images and shot data, and clear this session' : '';
+  deleteButton.title = finished ? 'Delete the images and shot data, and clear this session' : '';
+  if (finished) deleteButton.disabled = false;
   const exportData = document.getElementById('session-export');
   const canExport = !active && sessionState.entries.length > 0;
   exportData.disabled = !canExport;
@@ -2533,6 +2598,12 @@ function listedSessionKey(fileName) {
   return `${match[1]}--${match[2]}`;
 }
 
+function listedSessionDataKey(fileName) {
+  const match = String(fileName).match(/^(\d{6})--([A-Za-z0-9][A-Za-z0-9_-]{0,80})--shot-data\.(?:txt|csv)$/i);
+  if (!match) return '';
+  return `${match[1]}--${match[2]}`;
+}
+
 function compareListedImages(a, b) {
   const rank = (img) => {
     const base = listedFileName(img).replace(/\.(jpe?g|png)$/i, '');
@@ -2624,6 +2695,66 @@ function cancelPendingShots() {
   sessionState.pendingShots = [];
 }
 
+function clearSessionResults() {
+  sessionState.dismissed = true;
+  sessionState.active = false;
+  sessionState.queue.length = 0;
+  sessionState.entries = [];
+  sessionState.count = 0;
+  sessionState.startedAt = 0;
+  sessionState.frozenElapsed = 0;
+  sessionState.exportColumns = null;
+  sessionState.dataCsv = '';
+  sessionState.pendingShots = [];
+  stopSessionTimer();
+  document.getElementById('session-timer').textContent = '0:00.0';
+  renderSessionLog();
+  updateSessionProgress();
+  updateSessionControls();
+  persistSession();
+}
+
+function archiveSessionResults() {
+  if (sessionState.active || !(sessionState.startedAt > 0)) return;
+  clearSessionResults();
+  showStatusMessage('Session kept in the gallery', 2000);
+}
+
+async function deleteSessionResults() {
+  if (sessionState.active || !(sessionState.startedAt > 0)) return;
+  const name = String(sessionState.name || '').trim() || 'this session';
+  if (!window.confirm(`Delete the images and shot data for ${name}?`)) return;
+  if (!imageWs || imageWs.readyState !== WebSocket.OPEN) {
+    showStatusMessage('Image service is not connected', 2000);
+    return;
+  }
+  const deleteButton = document.getElementById('session-delete');
+  if (deleteButton) deleteButton.disabled = true;
+  const { key } = sessionDataIdentity();
+  sessionState.exportColumns = null;
+  cancelPendingShots();
+  try {
+    await sessionState.captureChain;
+    const listed = await requestImageList();
+    listed.filter((img) => {
+      const fileName = listedFileName(img);
+      return listedSessionKey(fileName) === key || listedSessionDataKey(fileName) === key;
+    }).forEach((img) => {
+      imageWs.send(JSON.stringify({
+        action: 'delete_image',
+        door: img.door,
+        timestamp: img.timestamp,
+        path: img.path
+      }));
+    });
+    clearSessionResults();
+    showStatusMessage('Session deleted', 2000);
+  } catch (error) {
+    showStatusMessage('Could not delete the session', 2000);
+    updateSessionControls();
+  }
+}
+
 function endSession(elapsedMs, cancelShots) {
   if (!sessionState.active) return;
   sessionState.active = false;
@@ -2650,6 +2781,7 @@ function startSession() {
   const intervalMs = imageCount != null && imageCount >= 2 ? readSecondsField('session-interval') : 0;
   if (!fileToken(name, '') || expected == null || delayMs == null || intervalMs == null || imageCount == null || sessionState.active) return;
   sessionState.active = true;
+  sessionState.dismissed = false;
   sessionState.shotsCancelled = false;
   sessionState.name = name;
   sessionState.expected = expected;
@@ -2695,6 +2827,7 @@ async function captureSessionPair(job) {
     const videoStream = door === 'front' ? frontVideoStream : backVideoStream;
     const timestampCheckbox = door === 'front' ? frontTimestampCheckbox : backTimestampCheckbox;
     const baseName = sessionImageBaseName(job.sessionName, job.names[door], job.inputNumber, job.when, job.shotIndex, job.total);
+    if (sessionState.shotsCancelled) return;
     if (!lastImage || !lastImage.image || lastImage.frames === 0 || !videoStream || !imageWs || imageWs.readyState !== WebSocket.OPEN) {
       showCaptureConfirm(door, '', false);
       return;
@@ -2790,6 +2923,10 @@ function initSessionUi() {
   });
   document.getElementById('session-input').addEventListener('click', recordSessionInput);
   document.getElementById('session-export').addEventListener('click', exportSessionData);
+  document.getElementById('session-archive').addEventListener('click', archiveSessionResults);
+  document.getElementById('session-delete').addEventListener('click', () => {
+    deleteSessionResults();
+  });
   restoreSession();
 }
 

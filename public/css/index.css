@@ -77,19 +77,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 0.65rem;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
 }
-.header-nav .control-btn.secondary {
-  width: auto;
-  margin-top: 0;
-  font-size: 0.85rem;
-  padding: 0.45rem 0.85rem;
-}
-/* ======================================================
-   GALLERY BUTTON — Match Apply Settings button style
-   ====================================================== */
-.header-nav .nav-link {
+.header-nav .nav-link,
+.header-nav .sync-time-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -98,30 +92,71 @@ body {
   color: #fff !important;
   text-decoration: none;
   padding: 8px 16px;
+  font-family: inherit;
   font-size: 0.9rem;
   font-weight: 600;
+  line-height: 1.2;
   border-radius: 8px;
   border: none;
   box-shadow: 0 3px 10px rgba(13, 110, 253, 0.35);
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
   white-space: nowrap;
+  cursor: pointer;
 }
 
-.header-nav .nav-link:hover {
+.header-nav .nav-link:hover,
+.header-nav .sync-time-btn:hover:not(:disabled) {
   background: linear-gradient(135deg, #0a58ca, #084298);
   transform: translateY(-1px);
   box-shadow: 0 5px 14px rgba(13, 110, 253, 0.45);
   color: #fff !important;
 }
 
-.header-nav .nav-link:active {
+.header-nav .nav-link:active,
+.header-nav .sync-time-btn:active:not(:disabled) {
   transform: translateY(0);
   box-shadow: 0 2px 6px rgba(13, 110, 253, 0.3);
 }
 
-/* Icon inside gallery button */
-.header-nav .nav-link i {
+.header-nav .sync-time-btn:disabled {
+  opacity: 0.72;
+  cursor: progress;
+  transform: none;
+}
+
+.header-nav .nav-link i,
+.header-nav .sync-time-btn i {
   font-size: 1rem;
+}
+.time-sync-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  max-width: 100%;
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  background: rgba(20, 92, 42, 0.94);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 650;
+  line-height: 1.2;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
+}
+.time-sync-status[hidden] {
+  display: none !important;
+}
+.time-sync-status.is-pending {
+  background: rgba(255, 255, 255, 0.94);
+  color: #002e74;
+}
+.time-sync-status.is-error {
+  background: rgba(132, 32, 32, 0.94);
+  color: #fff;
+}
+.time-sync-status i {
+  flex: 0 0 auto;
+  font-size: 0.9rem;
 }
 
 .main-layout {
@@ -181,8 +216,9 @@ body {
   gap: 0.4rem 0.85rem;
 }
 .session-fields > .session-field {
-  justify-content: space-between;
-  width: 100%;
+  justify-content: flex-start;
+  width: max-content;
+  max-width: 100%;
 }
 .session-fields > .session-btn {
   justify-self: start;
@@ -301,9 +337,14 @@ body {
   cursor: not-allowed;
 }
 .session-input-btn,
-.session-export-btn {
+.session-export-btn,
+.session-archive-btn {
   background: var(--button-primary);
   border-color: #fff;
+}
+.session-delete-btn {
+  background: #8d2b2b;
+  border-color: #6e1f1f;
 }
 .session-btn.is-stop {
   background: #8d2b2b;
@@ -1615,12 +1656,8 @@ width: 100%;
     display: flex;
     justify-content: flex-end;
   }
-  .header-nav .control-btn,
-  .header-nav .control-btn.secondary {
-    width: auto;
-    margin-top: 0;
-  }
-  .nav-link {
+  .nav-link,
+  .header-nav .sync-time-btn {
     min-width: 120px;
     font-size: 0.8rem;
     padding: 0.3rem 0.6rem;
@@ -1744,10 +1781,6 @@ width: 100%;
   }
   .app-title {
     font-size: 1.25rem;
-  }
-  .header-nav .control-btn.secondary {
-    width: auto;
-    margin-top: 0;
   }
   body {
     margin: 1px;
@@ -2278,74 +2311,6 @@ width: 100%;
     grid-template-columns: 5.4rem minmax(0, 1fr);
   }
 }
-.time-sync-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 4000;
-}
-
-.time-sync-content {
-  background: white;
-  border-radius: 12px;
-  width: 90%;
-  max-width: 380px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  overflow: hidden;
-}
-
-.time-sync-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 20px 24px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #dee2e6;
-}
-
-.time-sync-header h4 {
-  margin: 0;
-  font-size: 1.25rem;
-  color: #28a745;
-}
-
-.time-sync-body {
-  padding: 24px;
-  text-align: center;
-}
-
-.time-sync-body p {
-  margin: 0 0 8px 0;
-  color: #555;
-}
-
-.time-sync-footer {
-  padding: 16px 24px;
-  background: #f8f9fa;
-  text-align: right;
-  border-top: 1px solid #dee2e6;
-}
-
-.time-sync-close-btn {
-  background: #28a745;
-  color: white;
-  border: none;
-  padding: 10px 24px;
-  border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.time-sync-close-btn:hover {
-  background: #218838;
-}
-
 /* The row containing both camera sections */
 .camera-row {
   display: flex;
