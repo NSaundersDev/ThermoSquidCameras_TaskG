@@ -4,6 +4,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const archiver = require('archiver');
 const { spawn } = require('child_process');
+const { notifyDevice } = require('./notify_device');
 
 const repoRoot = path.resolve(__dirname, '../..');
 const baseDir = path.join(repoRoot, 'public', 'images');
@@ -259,6 +260,18 @@ wss.on('connection', (ws) => {
         const { door, date } = data;
         const images = await listImages(door || 'all', date);
         ws.send(JSON.stringify({ status: 'image_list', door: door || 'all', date, images }));
+      } else if (data.action === 'notify_device') {
+        const host = typeof data.host === 'string' ? data.host.trim() : '';
+        try {
+          await notifyDevice(host, data.shot);
+        } catch (error) {
+          const message = error && error.code === 'INVALID_HOST'
+            ? 'Device IP is not valid'
+            : 'Could not reach the device';
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ status: 'error', action: 'notify_device', message }));
+          }
+        }
       } else {
         ws.send(JSON.stringify({ status: 'error', message: 'Invalid action' }));
       }
