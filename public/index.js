@@ -2003,7 +2003,7 @@ function notifyStatusText(message) {
 function normalizeShotTemperature(item) {
   if (item == null || item === '') return null;
   const value = Number(item);
-  return Number.isFinite(value) ? value : null;
+  return Number.isFinite(value) ? Number(value.toFixed(1)) : null;
 }
 
 function normalizeReading(reading) {

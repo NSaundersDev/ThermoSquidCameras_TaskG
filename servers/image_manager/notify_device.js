@@ -64,13 +64,13 @@ function parseLoose(text) {
 
 function readTemperature(item) {
   if (item == null) return null;
-  if (typeof item === 'number') return Number.isFinite(item) ? item : null;
+  if (typeof item === 'number') return Number.isFinite(item) ? Number(item.toFixed(1)) : null;
   if (typeof item !== 'string') return null;
   let text = item.trim().replace(/°/g, '');
   if (!text || /^(nan|none|null|open|error|n\/a|---|inf|-inf|infinity|-infinity)$/i.test(text)) return null;
   text = text.replace(',', '.').replace(/\s*[cCfF]$/, '').trim();
   const value = Number(text);
-  return Number.isFinite(value) ? value : null;
+  return Number.isFinite(value) ? Number(value.toFixed(1)) : null;
 }
 
 function isTempLike(item) {
