@@ -277,7 +277,8 @@ body {
   border-color: #ced4da;
   cursor: not-allowed;
 }
-.session-input-btn {
+.session-input-btn,
+.session-export-btn {
   background: var(--button-primary);
   border-color: #fff;
 }
@@ -310,18 +311,14 @@ body {
   font-weight: 700;
 }
 .session-log {
-  grid-column: 2;
-  grid-row: 2;
-  justify-self: center;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.35rem;
-  width: max-content;
-  max-width: 22rem;
-  margin: 0;
+  grid-column: 1 / -1;
+  grid-row: 3;
+  justify-self: stretch;
+  width: 100%;
+  max-width: none;
+  margin: 0.2rem 0 0;
   padding: 0;
-  list-style: none;
+  overflow-x: auto;
 }
 @media (max-width: 760px) {
   .session-bar {
@@ -339,21 +336,42 @@ body {
 .session-log:empty {
   display: none;
 }
-.session-log li {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 0.45rem;
-  align-items: center;
-  max-width: 22rem;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  background: #fff;
-  border: 1px solid #adb5bd;
+.session-log table {
+  width: 100%;
+  min-width: calc(11rem + var(--session-temp-cols, 0) * 4.5rem);
+  border-collapse: collapse;
+  table-layout: fixed;
   font-family: 'Roboto Mono', Consolas, monospace;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
 }
-.session-log-count,
-.session-log-temp {
+.session-log th,
+.session-log td {
+  padding: 0.32rem 0.5rem;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid #cfd4da;
+}
+.session-log th {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--primary-blue);
+  background: rgba(0, 25, 116, 0.08);
+}
+.session-log th:first-child,
+.session-log td:first-child {
+  width: 4.5rem;
+  text-align: center;
+}
+.session-log th:nth-child(2),
+.session-log td:nth-child(2) {
+  width: 6.5rem;
+}
+.session-log tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.55);
+}
+.session-log-count {
   font-weight: 700;
 }
 .layout-grid {

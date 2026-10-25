@@ -2017,7 +2017,7 @@ function normalizeReading(reading) {
 }
 
 function formatShotTemperature(value) {
-  return String(Math.round(value * 100) / 100);
+  return Number(value).toFixed(2);
 }
 
 function storedThermocouples() {
@@ -2324,6 +2324,12 @@ function updateSessionControls() {
   document.getElementById('session-input').hidden = !active;
   document.getElementById('session-live').hidden = !started;
   document.getElementById('session-side').hidden = !started;
+  const exportData = document.getElementById('session-export');
+  const canExport = !active && sessionState.entries.length > 0;
+  exportData.disabled = !canExport;
+  exportData.title = active
+    ? 'Available after the session ends'
+    : (canExport ? 'Download the shot table' : 'No shot data to export');
   const start = document.getElementById('session-start');
   const icon = start.querySelector('i');
   const label = start.querySelector('span');
@@ -2358,30 +2364,71 @@ function updateSessionProgress() {
 function renderSessionLog() {
   const list = document.getElementById('session-log');
   const selected = selectedThermocoupleIndexes();
-  list.replaceChildren(...sessionState.entries.map((entry) => {
-    const item = document.createElement('li');
-    const count = document.createElement('span');
+  if (!sessionState.entries.length) {
+    list.replaceChildren();
+    return;
+  }
+  const table = document.createElement('table');
+  table.style.setProperty('--session-temp-cols', String(selected.length));
+  const headRow = document.createElement('tr');
+  ['Shot', 'Time', ...selected.map((index) => `TC${index}`)].forEach((label) => {
+    const cell = document.createElement('th');
+    cell.scope = 'col';
+    cell.textContent = label;
+    headRow.append(cell);
+  });
+  const head = document.createElement('thead');
+  head.append(headRow);
+  const body = document.createElement('tbody');
+  sessionState.entries.forEach((entry) => {
+    const row = document.createElement('tr');
+    row.dataset.wallClock = String(entry.at);
+    row.title = new Date(entry.at).toLocaleTimeString();
+    if (entry.reading) row.title += ` · ${entry.reading.at}`;
+    const count = document.createElement('td');
     count.className = 'session-log-count';
     count.textContent = String(entry.number).padStart(2, '0');
-    const time = document.createElement('span');
+    const time = document.createElement('td');
     time.className = 'session-log-time';
     time.textContent = formatElapsed(entry.elapsed);
-    item.dataset.wallClock = String(entry.at);
-    item.title = new Date(entry.at).toLocaleTimeString();
-    item.append(count, time);
+    row.append(count, time);
     const temperatures = entry.reading && entry.reading.temperatures;
-    if (entry.reading) item.title += ` · ${entry.reading.at}`;
-    if (Array.isArray(temperatures)) {
-      for (const index of selected) {
-        const temp = document.createElement('span');
-        temp.className = 'session-log-temp';
-        const value = temperatures[index - 1];
-        temp.textContent = Number.isFinite(value) ? `TC${index} ${formatShotTemperature(value)}` : `TC${index} —`;
-        item.append(temp);
-      }
-    }
-    return item;
-  }));
+    selected.forEach((index) => {
+      const temp = document.createElement('td');
+      temp.className = 'session-log-temp';
+      const value = Array.isArray(temperatures) ? temperatures[index - 1] : null;
+      temp.textContent = Number.isFinite(value) ? formatShotTemperature(value) : '—';
+      row.append(temp);
+    });
+    body.append(row);
+  });
+  table.append(head, body);
+  list.replaceChildren(table);
+}
+
+function csvCell(value) {
+  const text = String(value);
+  if (/[",\r\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+  return text;
+}
+
+function exportSessionData() {
+  if (sessionState.active || !sessionState.entries.length) return;
+  const table = document.querySelector('#session-log table');
+  if (!table) return;
+  const rows = [[...table.querySelectorAll('thead th')].map((cell) => cell.textContent)];
+  table.querySelectorAll('tbody tr').forEach((row) => {
+    rows.push([...row.children].map((cell) => cell.textContent));
+  });
+  const csv = `\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}`;
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  link.href = url;
+  link.download = `${fileToken(sessionState.name, 'session')}-shots.csv`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function stopSessionTimer() {
@@ -2565,6 +2612,7 @@ function initSessionUi() {
     else startSession();
   });
   document.getElementById('session-input').addEventListener('click', recordSessionInput);
+  document.getElementById('session-export').addEventListener('click', exportSessionData);
   restoreSession();
 }
 
