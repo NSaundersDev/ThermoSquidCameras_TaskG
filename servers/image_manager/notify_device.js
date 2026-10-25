@@ -27,30 +27,150 @@ function settle(item, error, value) {
   else item.resolve(value);
 }
 
-function parseReading(data) {
-  const text = Buffer.isBuffer(data) ? data.toString('utf8') : String(data);
+function toText(data) {
+  if (typeof data === 'string') return data;
+  if (Buffer.isBuffer(data)) return data.toString('utf8');
+  if (Array.isArray(data) && data.every((part) => Buffer.isBuffer(part))) return Buffer.concat(data).toString('utf8');
+  return String(data);
+}
+
+function snippet(text) {
+  return String(text || '').replace(/[^\x20-\x7E]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+}
+
+function badReading(text) {
+  const extra = snippet(text);
+  console.error('Device reading was not recognized:', extra || '(empty)');
+  return coded(extra ? `Temperature reading was not valid: ${extra}` : 'Temperature reading was not valid', 'BAD_READING');
+}
+
+function parseLoose(text) {
+  let trimmed = String(text || '').replace(/^\uFEFF/, '').trim();
+  if (trimmed.startsWith('(') && trimmed.endsWith(')')) trimmed = `[${trimmed.slice(1, -1)}]`;
+  try {
+    return JSON.parse(trimmed);
+  } catch (error) {
+    const loosened = trimmed
+      .replace(/\bNaN\b/gi, 'null')
+      .replace(/\b-?Infinity\b/g, 'null')
+      .replace(/\bNone\b/g, 'null')
+      .replace(/\bTrue\b/g, 'true')
+      .replace(/\bFalse\b/g, 'false')
+      .replace(/,\s*([\]}])/g, '$1')
+      .replace(/'/g, '"');
+    return JSON.parse(loosened);
+  }
+}
+
+function readTemperature(item) {
+  if (item == null) return null;
+  if (typeof item === 'number') return Number.isFinite(item) ? item : null;
+  if (typeof item !== 'string') return null;
+  let text = item.trim().replace(/°/g, '');
+  if (!text || /^(nan|none|null|open|error|n\/a|---|inf|-inf|infinity|-infinity)$/i.test(text)) return null;
+  text = text.replace(',', '.').replace(/\s*[cCfF]$/, '').trim();
+  const value = Number(text);
+  return Number.isFinite(value) ? value : null;
+}
+
+function isTempLike(item) {
+  if (item == null || typeof item === 'number') return true;
+  if (typeof item !== 'string') return false;
+  const text = item.trim();
+  if (!text || /^(nan|none|null|open|error|n\/a|---|inf|-inf|infinity|-infinity)$/i.test(text)) return true;
+  return /^-?\d+(?:[.,]\d+)?\s*°?\s*[cCfF]?$/.test(text);
+}
+
+function formatStamp(value) {
+  if (typeof value === 'string' || typeof value === 'number') {
+    const text = String(value).trim();
+    return text || null;
+  }
+  if (Array.isArray(value) && value.every((part) => typeof part === 'string' || typeof part === 'number')) {
+    const text = value.map((part) => String(part).trim()).filter(Boolean).join(' ');
+    return text || null;
+  }
+  if (value && typeof value === 'object') {
+    const date = value.date || value.day || '';
+    const time = value.time || value.clock || '';
+    const text = `${date} ${time}`.trim();
+    return text || null;
+  }
+  return null;
+}
+
+function readingFromArray(value) {
+  let at = null;
+  let plain = null;
+  let list = null;
+  for (const item of value) {
+    if (!list && Array.isArray(item) && item.every(isTempLike)) {
+      list = item;
+      continue;
+    }
+    const stamp = formatStamp(item);
+    if (!stamp) continue;
+    if (typeof item === 'number' && Math.abs(item) <= 1e8) continue;
+    if ((typeof item === 'number' && Math.abs(item) > 1e8) || (/[-:/T]/.test(stamp) && /\d/.test(stamp))) {
+      at = at || stamp;
+    } else if (typeof item === 'string') {
+      plain = plain || stamp;
+    }
+  }
+  if (!at) at = plain;
+  if (!list) {
+    const temps = value.filter((item, index) => index > 0 && isTempLike(item));
+    if (temps.length && temps.length === value.length - 1) list = value.slice(1);
+  }
+  if (!at || !list) return null;
+  return { at, temperatures: list.map(readTemperature) };
+}
+
+function readingFromObject(value) {
+  const lists = ['temperatures', 'temps', 'temperature', 'values', 'channels', 'data'];
+  for (const key of lists) {
+    if (!Array.isArray(value[key]) || !value[key].every(isTempLike)) continue;
+    const at = formatStamp(value.datetime || value.time || value.timestamp || value.date || value.at);
+    if (!at) continue;
+    return { at, temperatures: value[key].map(readTemperature) };
+  }
+  if (Array.isArray(value.data)) return readingFromArray(value.data);
+  return null;
+}
+
+function parseCsv(text) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed || trimmed.startsWith('[') || trimmed.startsWith('{')) return null;
+  const parts = trimmed.split(',').map((part) => part.trim()).filter((part) => part !== '');
+  if (parts.length < 2 || !parts.slice(1).every(isTempLike)) return null;
+  const at = formatStamp(parts[0]);
+  if (!at || !/[-:/T]/.test(at)) return null;
+  return { at, temperatures: parts.slice(1).map(readTemperature) };
+}
+
+function interpret(text) {
+  const raw = String(text || '').trim();
+  if (/^(ok|ack|ping|pong|ready|connected)$/i.test(raw)) return { ignore: true };
   let value;
   try {
-    value = JSON.parse(text);
+    value = parseLoose(raw);
+    if (typeof value === 'string') value = parseLoose(value);
   } catch (error) {
-    throw coded('Temperature reading was not valid', 'BAD_READING');
+    const csv = parseCsv(raw);
+    if (csv) return { reading: csv };
+    return { invalid: true };
   }
-  if (!Array.isArray(value) || value.length < 2) {
-    throw coded('Temperature reading was not valid', 'BAD_READING');
+  if (Array.isArray(value)) {
+    const reading = readingFromArray(value);
+    if (reading) return { reading };
+    return { invalid: true };
   }
-  const at = value[0];
-  if ((typeof at !== 'string' && typeof at !== 'number') || !String(at).trim()) {
-    throw coded('Temperature reading was not valid', 'BAD_READING');
+  if (value && typeof value === 'object') {
+    const reading = readingFromObject(value);
+    if (reading) return { reading };
+    return { ignore: true };
   }
-  const list = Array.isArray(value[1]) ? value[1] : value.slice(1);
-  if (!list.length && !Array.isArray(value[1])) {
-    throw coded('Temperature reading was not valid', 'BAD_READING');
-  }
-  const temperatures = list.map((item) => Number(item));
-  if (temperatures.some((item) => !Number.isFinite(item))) {
-    throw coded('Temperature reading was not valid', 'BAD_READING');
-  }
-  return { at: String(at).trim(), temperatures };
+  return { invalid: true };
 }
 
 function retire(host) {
@@ -80,15 +200,19 @@ function readOne(entry, payload, timeoutMs) {
       if (error) reject(error);
       else resolve(value);
     }
-    function onMessage(data) {
-      try {
-        finish(null, parseReading(data));
-      } catch (error) {
-        finish(error);
-      }
-    }
     function cancel(error) {
       finish(error);
+    }
+    function onMessage(data) {
+      const text = toText(data);
+      try {
+        const outcome = interpret(text);
+        if (outcome.ignore) return;
+        if (outcome.reading) finish(null, outcome.reading);
+        else finish(badReading(text));
+      } catch (error) {
+        finish(badReading(text));
+      }
     }
     entry.wait = onMessage;
     entry.cancel = cancel;
@@ -167,10 +291,8 @@ function openEntry(host, url) {
   socket.on('error', fail);
   socket.on('close', fail);
   socket.on('message', (data) => {
-    const wait = entry.wait;
-    if (!wait) return;
-    entry.wait = null;
-    wait(data);
+    if (!entry.wait) return;
+    entry.wait(data);
   });
   socket.on('open', () => pump(entry));
   return entry;

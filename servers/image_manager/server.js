@@ -265,8 +265,7 @@ wss.on('connection', (ws) => {
         const notifyErrors = {
           INVALID_HOST: 'Device IP is not valid',
           UNREACHABLE: 'Could not reach the device',
-          NO_READING: 'No temperature reading',
-          BAD_READING: 'Temperature reading was not valid'
+          NO_READING: 'No temperature reading'
         };
         try {
           const reading = await notifyDevice(host, data.shot);
@@ -280,7 +279,9 @@ wss.on('connection', (ws) => {
             }));
           }
         } catch (error) {
-          const message = notifyErrors[error && error.code] || 'Could not reach the device';
+          const message = error && error.code === 'BAD_READING'
+            ? error.message
+            : (notifyErrors[error && error.code] || 'Could not reach the device');
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ status: 'error', action: 'notify_device', message }));
           }

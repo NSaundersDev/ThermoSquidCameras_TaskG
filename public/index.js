@@ -1996,17 +1996,25 @@ function notifyShot(count) {
 }
 
 function notifyStatusText(message) {
-  if (message === 'Device IP is not valid' || message === 'No temperature reading' || message === 'Temperature reading was not valid') return message;
+  if (message === 'Device IP is not valid' || message === 'No temperature reading') return message;
+  if (typeof message === 'string' && message.startsWith('Temperature reading was not valid')) return message;
   return 'Could not reach the device';
 }
 
+function normalizeShotTemperature(item) {
+  if (item == null || item === '') return null;
+  const value = Number(item);
+  return Number.isFinite(value) ? value : null;
+}
+
 function normalizeReading(reading) {
-  if (!reading || (typeof reading.at !== 'string' && typeof reading.at !== 'number')) return null;
+  if (!reading || (typeof reading.at !== 'string' && typeof reading.at !== 'number') || !Array.isArray(reading.temperatures)) return null;
   const at = String(reading.at).trim();
-  if (!at || !Array.isArray(reading.temperatures)) return null;
-  const temperatures = reading.temperatures.slice(0, THERMOCOUPLE_MAX).map((item) => Number(item));
-  if (temperatures.some((item) => !Number.isFinite(item))) return null;
-  return { at, temperatures };
+  if (!at) return null;
+  return {
+    at,
+    temperatures: reading.temperatures.slice(0, THERMOCOUPLE_MAX).map(normalizeShotTemperature)
+  };
 }
 
 function formatShotTemperature(value) {
