@@ -2563,7 +2563,7 @@ async function exportSessionData() {
   try {
     const listed = await requestImageList();
     const { key, fileBase } = sessionDataIdentity();
-    const dataName = `${fileBase}.csv`;
+    const dataName = `${fileBase}.txt`;
     const photos = listed.filter((img) => {
       const name = listedFileName(img);
       return /\.(jpe?g|png)$/i.test(name) && listedSessionKey(name) === key;
