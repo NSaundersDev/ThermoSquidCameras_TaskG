@@ -2009,7 +2009,7 @@ function normalizeReading(reading) {
   return { at, temperatures };
 }
 
-function formatTemperature(value) {
+function formatShotTemperature(value) {
   return String(Math.round(value * 100) / 100);
 }
 
@@ -2377,7 +2377,7 @@ function renderSessionLog() {
         const temp = document.createElement('span');
         temp.className = 'session-log-temp';
         const value = temperatures[index - 1];
-        temp.textContent = Number.isFinite(value) ? `TC${index} ${formatTemperature(value)}` : `TC${index} —`;
+        temp.textContent = Number.isFinite(value) ? `TC${index} ${formatShotTemperature(value)}` : `TC${index} —`;
         item.append(temp);
       }
     }
