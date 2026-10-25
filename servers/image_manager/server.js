@@ -262,12 +262,25 @@ wss.on('connection', (ws) => {
         ws.send(JSON.stringify({ status: 'image_list', door: door || 'all', date, images }));
       } else if (data.action === 'notify_device') {
         const host = typeof data.host === 'string' ? data.host.trim() : '';
+        const notifyErrors = {
+          INVALID_HOST: 'Device IP is not valid',
+          UNREACHABLE: 'Could not reach the device',
+          NO_READING: 'No temperature reading',
+          BAD_READING: 'Temperature reading was not valid'
+        };
         try {
-          await notifyDevice(host, data.shot);
+          const reading = await notifyDevice(host, data.shot);
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              status: 'ok',
+              action: 'notify_device',
+              shot: data.shot,
+              at: reading.at,
+              temperatures: reading.temperatures
+            }));
+          }
         } catch (error) {
-          const message = error && error.code === 'INVALID_HOST'
-            ? 'Device IP is not valid'
-            : 'Could not reach the device';
+          const message = notifyErrors[error && error.code] || 'Could not reach the device';
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ status: 'error', action: 'notify_device', message }));
           }

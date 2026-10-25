@@ -554,8 +554,11 @@ function connectImageWebSocket() {
       const data = JSON.parse(event.data);
       if (data.action === 'notify_device') {
         if (data.status === 'error') {
-          const message = data.message === 'Device IP is not valid' ? data.message : 'Could not reach the device';
-          showStatusMessage(message, 2000);
+          showStatusMessage(notifyStatusText(data.message), 2000);
+          return;
+        }
+        if (data.status === 'ok' && !applyShotReading(data.shot, data.at, data.temperatures)) {
+          showStatusMessage('Temperature reading was not valid', 2000);
         }
         return;
       }
@@ -1933,6 +1936,9 @@ restoreCameraSettings('back');
 const CAMERA_NAMES_KEY = 'thermosquid.cameraNames';
 const SESSION_STORAGE_KEY = 'thermosquid.session';
 const NOTIFY_HOST_KEY = 'thermosquid.notifyHost';
+const THERMOCOUPLE_KEY = 'thermosquid.thermocouples';
+const THERMOCOUPLE_MIN = 8;
+const THERMOCOUPLE_MAX = 64;
 const DEFAULT_CAMERA_NAMES = { front: 'Front', back: 'Back' };
 const sessionState = {
   active: false,
@@ -1987,6 +1993,96 @@ function notifyShot(count) {
     return;
   }
   imageWs.send(JSON.stringify({ action: 'notify_device', host: deviceHost, shot: count }));
+}
+
+function notifyStatusText(message) {
+  if (message === 'Device IP is not valid' || message === 'No temperature reading' || message === 'Temperature reading was not valid') return message;
+  return 'Could not reach the device';
+}
+
+function normalizeReading(reading) {
+  if (!reading || (typeof reading.at !== 'string' && typeof reading.at !== 'number')) return null;
+  const at = String(reading.at).trim();
+  if (!at || !Array.isArray(reading.temperatures)) return null;
+  const temperatures = reading.temperatures.slice(0, THERMOCOUPLE_MAX).map((item) => Number(item));
+  if (temperatures.some((item) => !Number.isFinite(item))) return null;
+  return { at, temperatures };
+}
+
+function formatTemperature(value) {
+  return String(Math.round(value * 100) / 100);
+}
+
+function storedThermocouples() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(THERMOCOUPLE_KEY) || '[]');
+    if (!Array.isArray(saved)) return [];
+    return [...new Set(saved.filter((index) => Number.isInteger(index) && index >= 1 && index <= THERMOCOUPLE_MAX))].sort((a, b) => a - b);
+  } catch (error) {
+    return [];
+  }
+}
+
+function selectedThermocoupleIndexes() {
+  const list = document.getElementById('session-thermocouple-list');
+  const boxes = list ? [...list.querySelectorAll('input')] : [];
+  if (!boxes.length) return storedThermocouples();
+  return boxes.filter((box) => box.checked).map((box) => Number(box.value));
+}
+
+function saveThermocouples() {
+  try {
+    localStorage.setItem(THERMOCOUPLE_KEY, JSON.stringify(selectedThermocoupleIndexes()));
+  } catch (error) {
+    console.debug('Thermocouples were not stored');
+  }
+}
+
+function thermocoupleSlotCount(selected) {
+  let count = THERMOCOUPLE_MIN;
+  for (const index of selected) count = Math.max(count, index);
+  for (const entry of sessionState.entries) {
+    const temperatures = entry.reading && entry.reading.temperatures;
+    if (Array.isArray(temperatures)) count = Math.max(count, Math.min(THERMOCOUPLE_MAX, temperatures.length));
+  }
+  return Math.min(THERMOCOUPLE_MAX, count);
+}
+
+function renderThermocoupleChoices() {
+  const list = document.getElementById('session-thermocouple-list');
+  if (!list) return;
+  const selected = new Set(list.querySelector('input') ? selectedThermocoupleIndexes() : storedThermocouples());
+  const count = thermocoupleSlotCount(selected);
+  for (let index = 1; index <= count; index += 1) {
+    if (document.getElementById(`thermocouple-${index}`)) continue;
+    const label = document.createElement('label');
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.id = `thermocouple-${index}`;
+    input.value = String(index);
+    input.checked = selected.has(index);
+    input.setAttribute('aria-label', `Thermocouple ${index}`);
+    input.addEventListener('change', () => {
+      saveThermocouples();
+      renderSessionLog();
+    });
+    const name = document.createElement('span');
+    name.textContent = `TC${index}`;
+    label.append(input, name);
+    list.append(label);
+  }
+}
+
+function applyShotReading(shot, at, temperatures) {
+  const reading = normalizeReading({ at, temperatures });
+  if (!reading || !Number.isInteger(shot)) return false;
+  const entry = sessionState.entries.find((item) => item.number === shot);
+  if (!entry) return true;
+  entry.reading = reading;
+  renderThermocoupleChoices();
+  renderSessionLog();
+  persistSession();
+  return true;
 }
 
 function fileToken(value, fallback) {
@@ -2114,7 +2210,12 @@ function restoreSession() {
   sessionState.shotsCancelled = false;
   sessionState.entries = saved.entries.filter((entry) => (
     Number.isInteger(entry?.number) && Number.isFinite(entry.elapsed) && Number.isFinite(entry.at)
-  ));
+  )).map((entry) => {
+    const reading = normalizeReading(entry.reading);
+    const next = { number: entry.number, elapsed: entry.elapsed, at: entry.at };
+    if (reading) next.reading = reading;
+    return next;
+  });
   sessionState.queue = saved.queue.filter((at) => Number.isFinite(at));
   sessionState.names = {
     front: typeof saved.names?.front === 'string' && saved.names.front.trim() ? saved.names.front.trim() : cameraName('front'),
@@ -2128,6 +2229,7 @@ function restoreSession() {
   document.getElementById('front-camera-name').value = sessionState.names.front;
   document.getElementById('back-camera-name').value = sessionState.names.back;
   saveCameraNames();
+  renderThermocoupleChoices();
   renderSessionLog();
   updateSessionProgress();
   if (sessionState.active) {
@@ -2256,6 +2358,7 @@ function updateSessionProgress() {
 
 function renderSessionLog() {
   const list = document.getElementById('session-log');
+  const selected = selectedThermocoupleIndexes();
   list.replaceChildren(...sessionState.entries.map((entry) => {
     const item = document.createElement('li');
     const count = document.createElement('span');
@@ -2267,6 +2370,17 @@ function renderSessionLog() {
     item.dataset.wallClock = String(entry.at);
     item.title = new Date(entry.at).toLocaleTimeString();
     item.append(count, time);
+    const temperatures = entry.reading && entry.reading.temperatures;
+    if (entry.reading) item.title += ` · ${entry.reading.at}`;
+    if (Array.isArray(temperatures)) {
+      for (const index of selected) {
+        const temp = document.createElement('span');
+        temp.className = 'session-log-temp';
+        const value = temperatures[index - 1];
+        temp.textContent = Number.isFinite(value) ? `TC${index} ${formatTemperature(value)}` : `TC${index} —`;
+        item.append(temp);
+      }
+    }
     return item;
   }));
 }
@@ -2428,6 +2542,7 @@ function drainSessionInputs() {
 function initSessionUi() {
   restoreCameraNames();
   restoreNotifyHost();
+  renderThermocoupleChoices();
   const device = document.getElementById('session-device');
   device.addEventListener('input', saveNotifyHost);
   device.addEventListener('change', saveNotifyHost);
