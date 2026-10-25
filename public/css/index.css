@@ -167,10 +167,31 @@ body {
   grid-row: 1 / span 2;
   justify-self: start;
   align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
+  min-width: 0;
+}
+.session-fields {
   display: grid;
   grid-template-columns: max-content max-content max-content;
   align-items: center;
-  gap: 0.45rem 0.7rem;
+  justify-content: start;
+  gap: 0.4rem 0.85rem;
+}
+.session-fields > .session-field {
+  justify-content: space-between;
+  width: 100%;
+}
+.session-fields > .session-btn {
+  justify-self: start;
+}
+.session-extra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 1.25rem;
 }
 .session-side {
   grid-column: 3;
@@ -218,14 +239,10 @@ body {
 .session-count-field input {
   width: 4.2rem;
 }
-.session-device-field {
-  grid-column: 1 / -1;
-}
 .session-device-field input {
   width: 11rem;
 }
 .session-thermo-field {
-  grid-column: 1 / -1;
   min-width: 0;
   width: max-content;
   max-width: 100%;

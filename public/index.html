@@ -37,40 +37,42 @@
       <section id="session-bar" class="session-bar" aria-label="Capture session">
         <div class="session-controls">
         <div class="session-setup">
-          <label class="session-field" for="session-name">
-            Session
-            <input id="session-name" type="text" maxlength="40" placeholder="Name" autocomplete="off" aria-label="Session name">
-          </label>
-          <label class="session-field session-count-field" for="session-input-count">
-            Shots
-            <input id="session-input-count" type="number" min="1" max="99" step="1" value="1" inputmode="numeric" aria-label="Number of inputs">
-          </label>
-          <button type="button" id="session-start" class="session-btn" disabled>
-            <i class="fa-solid fa-play" aria-hidden="true"></i>
-            <span>Start</span>
-          </button>
-          <label class="session-field session-count-field" for="session-delay">
-            Delay s
-            <input id="session-delay" type="number" min="0" max="3600" step="0.1" value="0" inputmode="decimal" aria-label="Seconds to wait after an input before the first image">
-          </label>
-          <label class="session-field session-count-field" for="session-image-count">
-            Images
-            <input id="session-image-count" type="number" min="1" max="20" step="1" value="1" inputmode="numeric" aria-label="Number of images to take after each input">
-          </label>
-          <label class="session-field session-count-field" for="session-interval">
-            Interval s
-            <input id="session-interval" type="number" min="0" max="3600" step="0.1" value="1" inputmode="decimal" aria-label="Seconds between images after the first">
-          </label>
-          <span style="display:flex;flex-direction:row;white-space:nowrap;">
+          <div class="session-fields">
+            <label class="session-field" for="session-name">
+              Session
+              <input id="session-name" type="text" maxlength="40" placeholder="Name" autocomplete="off" aria-label="Session name">
+            </label>
+            <label class="session-field session-count-field" for="session-input-count">
+              Shots
+              <input id="session-input-count" type="number" min="1" max="99" step="1" value="1" inputmode="numeric" aria-label="Number of inputs">
+            </label>
+            <button type="button" id="session-start" class="session-btn" disabled>
+              <i class="fa-solid fa-play" aria-hidden="true"></i>
+              <span>Start</span>
+            </button>
+            <label class="session-field session-count-field" for="session-delay">
+              Delay s
+              <input id="session-delay" type="number" min="0" max="3600" step="0.1" value="0" inputmode="decimal" aria-label="Seconds to wait after an input before the first image">
+            </label>
+            <label class="session-field session-count-field" for="session-image-count">
+              Images
+              <input id="session-image-count" type="number" min="1" max="20" step="1" value="1" inputmode="numeric" aria-label="Number of images to take after each input">
+            </label>
+            <label class="session-field session-count-field" for="session-interval">
+              Interval s
+              <input id="session-interval" type="number" min="0" max="3600" step="0.1" value="1" inputmode="decimal" aria-label="Seconds between images after the first">
+            </label>
+          </div>
+          <div class="session-extra">
             <label class="session-field session-device-field" for="session-device">
               Device IP
               <input id="session-device" type="text" placeholder="IP address" autocomplete="off" spellcheck="false" aria-label="Device IP address" title="Sends the shot count to this address on port 8080">
             </label>
-            <fieldset class="session-thermo-field" id="session-thermocouples" style="margin-left:3em;">
+            <fieldset class="session-thermo-field" id="session-thermocouples">
               <legend>Thermocouples</legend>
               <div id="session-thermocouple-list" class="session-thermocouple-list"></div>
             </fieldset>
-          </span>
+          </div>
         </div>
         <div id="session-live" class="session-live" hidden>
           <div id="session-timer" class="session-timer" role="timer">0:00.0</div>
