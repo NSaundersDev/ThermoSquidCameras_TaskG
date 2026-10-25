@@ -128,8 +128,12 @@ function imageBaseName(fileName) {
   return String(fileName).replace(/\.(jpe?g|png)$/i, '');
 }
 
+function dataFileBadge(fileName) {
+  return /\.txt$/i.test(String(fileName || '')) ? 'TXT' : 'CSV';
+}
+
 function parseSessionDataFile(fileName) {
-  const match = String(fileName || '').match(/^(\d{6})--([A-Za-z0-9][A-Za-z0-9_-]{0,80})--shot-data\.csv$/i);
+  const match = String(fileName || '').match(/^(\d{6})--([A-Za-z0-9][A-Za-z0-9_-]{0,80})--shot-data\.(?:txt|csv)$/i);
   if (!match) return null;
   return {
     date: match[1],
@@ -420,7 +424,7 @@ function renderDataCard(file) {
   card.className = 'image-card data-card';
   const fileName = imageFileName(file);
   card.innerHTML = `
-    <div class="data-file">CSV</div>
+    <div class="data-file">${escapeHtml(dataFileBadge(fileName))}</div>
     <p class="file-name">${fileNameHtml(fileName)}</p>
     <p class="image-time">${new Date(file.timestamp).toLocaleString()}</p>
     <button class="download" type="button">Download</button>
@@ -436,7 +440,7 @@ function renderSessionCard(group) {
   link.href = `media_gallery.html?session=${encodeURIComponent(group.key)}`;
   const visual = preview
     ? `<img src="${escapeHtml(preview.path)}" alt="${escapeHtml(group.session)}" loading="lazy">`
-    : '<div class="data-file" aria-hidden="true">CSV</div>';
+    : `<div class="data-file" aria-hidden="true">${escapeHtml(dataFileBadge(group.dataFile && imageFileName(group.dataFile)))}</div>`;
   const meta = group.images.length
     ? `${formatSessionDate(group.date)} · ${group.images.length} images`
     : `${formatSessionDate(group.date)} · Data file`;
