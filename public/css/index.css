@@ -221,25 +221,30 @@ body {
 .session-thermo-field {
   grid-column: 1 / -1;
   min-width: 0;
-  max-width: 16.5rem;
+  width: max-content;
+  max-width: 100%;
   margin: 0;
   padding: 0;
   border: 0;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.2rem 0.45rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
 }
 .session-thermo-field legend {
+  display: block;
+  width: 100%;
+  margin: 0;
   padding: 0;
+  float: none;
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-primary);
 }
 .session-thermocouple-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.15rem 0.4rem;
+  display: grid;
+  grid-template-columns: repeat(4, max-content);
+  gap: 0.15rem 0.7rem;
 }
 .session-thermocouple-list label {
   display: inline-flex;

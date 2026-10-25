@@ -1937,8 +1937,7 @@ const CAMERA_NAMES_KEY = 'thermosquid.cameraNames';
 const SESSION_STORAGE_KEY = 'thermosquid.session';
 const NOTIFY_HOST_KEY = 'thermosquid.notifyHost';
 const THERMOCOUPLE_KEY = 'thermosquid.thermocouples';
-const THERMOCOUPLE_MIN = 8;
-const THERMOCOUPLE_MAX = 64;
+const THERMOCOUPLE_COUNT = 8;
 const DEFAULT_CAMERA_NAMES = { front: 'Front', back: 'Back' };
 const sessionState = {
   active: false,
@@ -2013,7 +2012,7 @@ function normalizeReading(reading) {
   if (!at) return null;
   return {
     at,
-    temperatures: reading.temperatures.slice(0, THERMOCOUPLE_MAX).map(normalizeShotTemperature)
+    temperatures: reading.temperatures.slice(0, THERMOCOUPLE_COUNT).map(normalizeShotTemperature)
   };
 }
 
@@ -2025,7 +2024,7 @@ function storedThermocouples() {
   try {
     const saved = JSON.parse(localStorage.getItem(THERMOCOUPLE_KEY) || '[]');
     if (!Array.isArray(saved)) return [];
-    return [...new Set(saved.filter((index) => Number.isInteger(index) && index >= 1 && index <= THERMOCOUPLE_MAX))].sort((a, b) => a - b);
+    return [...new Set(saved.filter((index) => Number.isInteger(index) && index >= 1 && index <= THERMOCOUPLE_COUNT))].sort((a, b) => a - b);
   } catch (error) {
     return [];
   }
@@ -2046,22 +2045,11 @@ function saveThermocouples() {
   }
 }
 
-function thermocoupleSlotCount(selected) {
-  let count = THERMOCOUPLE_MIN;
-  for (const index of selected) count = Math.max(count, index);
-  for (const entry of sessionState.entries) {
-    const temperatures = entry.reading && entry.reading.temperatures;
-    if (Array.isArray(temperatures)) count = Math.max(count, Math.min(THERMOCOUPLE_MAX, temperatures.length));
-  }
-  return Math.min(THERMOCOUPLE_MAX, count);
-}
-
 function renderThermocoupleChoices() {
   const list = document.getElementById('session-thermocouple-list');
   if (!list) return;
   const selected = new Set(list.querySelector('input') ? selectedThermocoupleIndexes() : storedThermocouples());
-  const count = thermocoupleSlotCount(selected);
-  for (let index = 1; index <= count; index += 1) {
+  for (let index = 1; index <= THERMOCOUPLE_COUNT; index += 1) {
     if (document.getElementById(`thermocouple-${index}`)) continue;
     const label = document.createElement('label');
     const input = document.createElement('input');
@@ -2079,6 +2067,9 @@ function renderThermocoupleChoices() {
     label.append(input, name);
     list.append(label);
   }
+  list.querySelectorAll('input').forEach((input) => {
+    if (Number(input.value) > THERMOCOUPLE_COUNT && input.parentElement) input.parentElement.remove();
+  });
 }
 
 function applyShotReading(shot, at, temperatures) {
