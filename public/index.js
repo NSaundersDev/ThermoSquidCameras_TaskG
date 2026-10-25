@@ -2017,7 +2017,7 @@ function normalizeReading(reading) {
 }
 
 function formatShotTemperature(value) {
-  return Number(value).toFixed(2);
+  return Number(value).toFixed(1);
 }
 
 function storedThermocouples() {
@@ -2412,11 +2412,20 @@ function csvCell(value) {
   return text;
 }
 
+function sessionStartedLabel() {
+  const when = new Date(sessionState.startedAt);
+  const pad = (value) => String(value).padStart(2, '0');
+  const stamp = `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())} ${pad(when.getHours())}:${pad(when.getMinutes())}:${pad(when.getSeconds())}`;
+  return `Session started ${stamp}`;
+}
+
 function exportSessionData() {
   if (sessionState.active || !sessionState.entries.length) return;
   const table = document.querySelector('#session-log table');
   if (!table) return;
-  const rows = [[...table.querySelectorAll('thead th')].map((cell) => cell.textContent)];
+  const headers = [...table.querySelectorAll('thead th')].map((cell) => cell.textContent);
+  headers.push(sessionStartedLabel());
+  const rows = [headers];
   table.querySelectorAll('tbody tr').forEach((row) => {
     rows.push([...row.children].map((cell) => cell.textContent));
   });
