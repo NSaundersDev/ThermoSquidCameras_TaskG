@@ -2397,7 +2397,7 @@ function renderSessionLog() {
       const temp = document.createElement('td');
       temp.className = 'session-log-temp';
       const value = Array.isArray(temperatures) ? temperatures[index - 1] : null;
-      temp.textContent = Number.isFinite(value) ? formatShotTemperature(value) : '—';
+      temp.textContent = Number.isFinite(value) ? `${formatShotTemperature(value)}°C` : '—';
       row.append(temp);
     });
     body.append(row);
@@ -2427,7 +2427,9 @@ function exportSessionData() {
   headers.push(sessionStartedLabel());
   const rows = [headers];
   table.querySelectorAll('tbody tr').forEach((row) => {
-    rows.push([...row.children].map((cell) => cell.textContent));
+    rows.push([...row.children].map((cell) => (
+      cell.classList.contains('session-log-temp') ? cell.textContent.replace(/°C$/, '') : cell.textContent
+    )));
   });
   const csv = `\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}`;
   const link = document.createElement('a');

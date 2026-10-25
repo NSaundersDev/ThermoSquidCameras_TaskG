@@ -363,7 +363,7 @@ body {
 }
 .session-log table {
   width: 100%;
-  min-width: calc(11rem + var(--session-temp-cols, 0) * 4.5rem);
+  min-width: calc(11rem + var(--session-temp-cols, 0) * 6rem);
   border-collapse: collapse;
   table-layout: fixed;
   font-family: 'Roboto Mono', Consolas, monospace;
