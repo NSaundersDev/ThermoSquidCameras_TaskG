@@ -2500,7 +2500,7 @@ function renderSessionLog() {
     count.textContent = String(entry.number).padStart(2, '0');
     const time = document.createElement('td');
     time.className = 'session-log-time';
-    time.textContent = formatElapsed(entry.elapsed);
+    time.textContent = `${formatElapsed(entry.elapsed)}`;
     row.append(count, time);
     const temperatures = entry.reading && entry.reading.temperatures;
     selected.forEach((index) => {

@@ -348,8 +348,8 @@ function deleteSessionImages() {
   const dataCount = images.filter((img) => parseSessionDataFile(imageFileName(img))).length;
   const imageCount = images.length - dataCount;
   const name = sessionHeading(selectedSessionKey()).split(' · ')[0] || 'this session';
-  let prompt = `Delete all ${imageCount} images in ${name}?`;
-  if (imageCount && dataCount) prompt = `Delete all ${imageCount} images and the data file in ${name}?`;
+  let prompt = `Delete all data and images in ${name}?`;
+  if (imageCount && dataCount) prompt = `Delete all data and images in ${name}?`;
   else if (dataCount) prompt = `Delete the data file in ${name}?`;
   if (!window.confirm(prompt)) return;
   if (!ws || ws.readyState !== WebSocket.OPEN) {
