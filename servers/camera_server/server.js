@@ -10,7 +10,7 @@ const AWB_MODES = new Set(['auto', 'incandescent', 'tungsten', 'fluorescent', 'i
 const DENOISE_MODES = new Set(['auto', 'off', 'cdn_off', 'cdn_fast', 'cdn_hq']);
 
 const defaultConfig = {
-  width: 1536, height: 864, framerate: 30,
+  width: 1280, height: 720, framerate: 30,
   brightness: 0, contrast: 1, sharpness: 1, saturation: 1,
   ev: 0, shutter: 0, gain: 0,
   metering: 'centre', exposure: 'normal', awb: 'auto',

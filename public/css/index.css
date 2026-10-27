@@ -2378,7 +2378,7 @@ width: 100%;
 .video-container {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 9;      /* 1536×864 ≈ 16:9 — change if your cameras differ */
+  aspect-ratio: 16 / 9;      /* 1280×720 is 16:9 */
   background: #111;
   border-radius: 8px;
   overflow: hidden;

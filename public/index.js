@@ -31,8 +31,8 @@ const frontSettingsMenu = document.getElementById('front-settings-menu');
 const backSettingsMenu = document.getElementById('back-settings-menu');
 // Camera config
 const cameraConfig = {
-  front: { resolution: '1536x864', framerate: 30 },
-  back: { resolution: '1536x864', framerate: 30 }
+  front: { resolution: '1280x720', framerate: 30 },
+  back: { resolution: '1280x720', framerate: 30 }
 };
 // Modal elements
 const modal = document.getElementById('camera-modal');
@@ -1751,9 +1751,9 @@ const CAMERA_SETTING_GROUPS = [
         type: 'select', id: 'resolution', label: 'Resolution',
         options: [
           ['640x480', '640×480'],
-          ['1280x720', '1280×720'],
+          ['1280x720', '1280×720', true],
           ['1920x1080', '1920×1080'],
-          ['1536x864', '1536×864', true]
+          ['1536x864', '1536×864']
         ]
       },
       {

@@ -344,8 +344,8 @@ def apply_usb(body):
         return 400, {"status": "error", "error": error}
 
     command, width, height, rate = usb_command(
-        number(body, "width", 640),
-        number(body, "height", 480),
+        number(body, "width", 1280),
+        number(body, "height", 720),
         number(body, "framerate", 30),
     )
     status, current = mediamtx("GET", "/v3/config/paths/get/cam_usb")
