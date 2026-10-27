@@ -1,0 +1,13 @@
+[Unit]
+Description=Imaging DAQ camera controls
+After=network-online.target mediamtx.service
+Wants=mediamtx.service
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/mediamtx/camera_controls.py
+WorkingDirectory=/opt/mediamtx
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

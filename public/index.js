@@ -1,8 +1,8 @@
 import { zipStored } from './session_pack.js';
 
 const host = window.location.hostname;
-// Picture settings still post to a local camera socket when one is open.
-// Live video comes from the mediaMTX URL on each card, not from that socket.
+// Picture settings are posted to the camera Pi named in each stream URL.
+// Live video still plays from that mediaMTX path.
 let frontCameraWs = null;
 let backCameraWs = null;
 let imageWs = new WebSocket(`ws://${host}:3000/ws`);
@@ -1693,6 +1693,8 @@ if (syncTimeBtn) {
   restoreStreamUrls();
   bindStreamField('front');
   bindStreamField('back');
+  syncCameraSettings('front');
+  syncCameraSettings('back');
   beginStream('front');
   beginStream('back');
   requestAnimationFrame(overlayLoop);
@@ -2162,20 +2164,68 @@ function bindSettingsResetDialog() {
   });
 }
 
-function applyCameraSettings(camera) {
+function controlUrl(camera) {
+  const input = document.getElementById(`${camera}-stream-url`);
+  const pageUrl = streamPageUrl(input ? input.value : '');
+  if (!pageUrl) return '';
+  const parsed = new URL(pageUrl);
+  const name = parsed.pathname.split('/').filter(Boolean)[0];
+  if (!name) return '';
+  parsed.username = '';
+  parsed.password = '';
+  parsed.port = '8090';
+  parsed.pathname = `/controls/${name}`;
+  parsed.search = '';
+  parsed.hash = '';
+  return parsed.toString();
+}
+
+async function applyCameraSettings(camera) {
   const settings = buildCameraSettings(camera);
   const payload = JSON.stringify(settings);
   writeStoredCameraSettings(camera, settings);
+  if (lastSentCameraSettings[camera] === payload) return;
 
-  const cameraWs = camera === 'front' ? frontCameraWs : backCameraWs;
-  if (!cameraWs || cameraWs.readyState !== WebSocket.OPEN) {
-    if (cameraWs) showStatusMessage(`${camera} camera not connected`, 2000);
+  const url = controlUrl(camera);
+  if (!url) {
+    showStatusMessage('Enter a stream URL first', 2000);
     return;
   }
-  if (lastSentCameraSettings[camera] === payload) return;
-  lastSentCameraSettings[camera] = payload;
-  cameraWs.send(payload);
-  showStatusMessage(`${camera} settings applied`, 1000);
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.status === 'error') {
+      showStatusMessage(data.error || `Could not apply ${cameraName(camera)} settings`, 2500);
+      return;
+    }
+    lastSentCameraSettings[camera] = payload;
+    showStatusMessage(`${cameraName(camera)} settings applied`, 1000);
+  } catch (error) {
+    showStatusMessage(`Could not apply ${cameraName(camera)} settings`, 2500);
+  }
+}
+
+async function syncCameraSettings(camera) {
+  const url = controlUrl(camera);
+  if (!url) return;
+  if (hasStoredCameraSettings(camera)) {
+    await applyCameraSettings(camera);
+    return;
+  }
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return;
+    const config = await response.json();
+    if (!config || config.status === 'error') return;
+    adoptCameraConfig(camera, config);
+    lastSentCameraSettings[camera] = JSON.stringify(buildCameraSettings(camera));
+  } catch (error) {
+    console.debug(`${camera} settings were not loaded`);
+  }
 }
 
 renderCameraSettings('front');
