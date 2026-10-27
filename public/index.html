@@ -106,8 +106,9 @@
             <div class="camera-panel front-camera">
               <div class="video-container">
                 <div class="video-wrapper">
-                  <img id="front-video-stream" class="camera-feed" alt="Front camera stream" style="display: none;" />
+                  <video id="front-video-stream" class="camera-feed" autoplay muted playsinline aria-label="Front camera stream"></video>
                   <canvas id="front-canvas" class="overlay-canvas" style="display: none;"></canvas>
+                  <p id="front-stream-status" class="stream-status" role="status">Connecting…</p>
                 </div>
                 <div id="front-capture-confirm" class="capture-confirm" hidden role="status" aria-live="polite">
                   <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
@@ -146,6 +147,10 @@
                     <input id="custom-file-name-front" type="text" placeholder="Optional" maxlength="50" aria-label="Custom filename for front camera captures">
                   </label>
                 </div>
+                <label class="stream-url-field" for="front-stream-url">
+                  Stream
+                  <input id="front-stream-url" type="text" spellcheck="false" autocomplete="off" value="http://192.168.1.37:8889/cam_ribbon" placeholder="http://192.168.1.37:8889/cam_ribbon" aria-label="Front camera mediaMTX stream URL" title="mediaMTX WebRTC address. The picture plays from this camera Pi.">
+                </label>
               </div>
               <div class="camera-settings-menu" id="front-settings-menu"></div>
             </div>
@@ -155,8 +160,9 @@
             <div class="camera-panel back-camera">
               <div class="video-container">
                 <div class="video-wrapper">
-                  <img id="back-video-stream" class="camera-feed" alt="Back camera stream" style="display: none;" />
+                  <video id="back-video-stream" class="camera-feed" autoplay muted playsinline aria-label="Back camera stream"></video>
                   <canvas id="back-canvas" class="overlay-canvas" style="display: none;"></canvas>
+                  <p id="back-stream-status" class="stream-status" role="status">Connecting…</p>
                 </div>
                 <div id="back-capture-confirm" class="capture-confirm" hidden role="status" aria-live="polite">
                   <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
@@ -195,6 +201,10 @@
                     <input id="custom-file-name-back" type="text" placeholder="Optional" maxlength="50" aria-label="Custom filename for back camera captures">
                   </label>
                 </div>
+                <label class="stream-url-field" for="back-stream-url">
+                  Stream
+                  <input id="back-stream-url" type="text" spellcheck="false" autocomplete="off" value="http://192.168.1.37:8889/cam_usb" placeholder="http://192.168.1.37:8889/cam_usb" aria-label="Back camera mediaMTX stream URL" title="mediaMTX WebRTC address. The picture plays from this camera Pi.">
+                </label>
               </div>
               <div class="camera-settings-menu" id="back-settings-menu"></div>
             </div>
@@ -217,7 +227,7 @@
               <span class="capture-confirm-name"></span>
             </span>
           </div>
-          <img id="modal-video-stream" class="modal-camera-feed" alt="Large camera view" />
+          <video id="modal-video-stream" class="modal-camera-feed" autoplay muted playsinline aria-label="Large camera view"></video>
           <canvas id="modal-canvas" class="modal-overlay-canvas"></canvas>
           <div class="modal-controls">
             <button id="modal-capture-btn" class="modal-capture-btn" aria-label="Capture from modal">

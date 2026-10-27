@@ -1,18 +1,14 @@
 import { zipStored } from './session_pack.js';
 
 const host = window.location.hostname;
-// WebSockets
-let frontCameraWs = new WebSocket(`ws://${host}:8081/ws`);
-let backCameraWs = new WebSocket(`ws://${host}:8082/ws`);
+// Picture settings still post to a local camera socket when one is open.
+// Live video comes from the mediaMTX URL on each card, not from that socket.
+let frontCameraWs = null;
+let backCameraWs = null;
 let imageWs = new WebSocket(`ws://${host}:3000/ws`);
 let temperatureWs = null;
-let reconnectAttempts = { front: 0, back: 0 }; // Camera-specific
-const maxReconnectAttempts = 5;
-const reconnectDelay = 2000;
 const lastCapturedImages = { front: null, back: null };
 let isPaused = { front: false, back: false };
-let invalidFrameCounts = { front: 0, back: 0 };
-const maxInvalidFrames = 5;
 // UI elements
 const frontVideoStream = document.getElementById('front-video-stream');
 const backVideoStream = document.getElementById('back-video-stream');
@@ -177,16 +173,29 @@ function showStatusMessage(message, duration = 1500) {
   statusMessage.dataset.timeoutId = timeoutId;
 }
 
+function mediaBox(element) {
+  if (!element) return { width: 0, height: 0, ready: false };
+  if (element.tagName === 'VIDEO') {
+    const width = element.videoWidth || 0;
+    const height = element.videoHeight || 0;
+    return { width, height, ready: element.readyState >= 2 && width > 0 && height > 0 };
+  }
+  const width = element.naturalWidth || 0;
+  const height = element.naturalHeight || 0;
+  return { width, height, ready: Boolean(element.complete && width > 0 && height > 0) };
+}
+
 function drawTimestamp(imageElement, canvas, ctx, door, timestamp, timestampCheckbox) {
-  if (!timestampCheckbox?.checked || !canvas || !ctx || !imageElement.complete) {
+  const box = mediaBox(imageElement);
+  // Keep a playing <video> in the layout. display:none can stall WebRTC decoding.
+  if (!timestampCheckbox?.checked || !canvas || !ctx || !box.ready) {
     if (canvas) canvas.style.display = 'none';
-    imageElement.style.display = 'block';
+    if (imageElement && imageElement.tagName !== 'VIDEO') imageElement.style.display = 'block';
     return;
   }
 
-  // Set canvas to the image's natural dimensions (full resolution)
-  const imgWidth = imageElement.naturalWidth || 1080;
-  const imgHeight = imageElement.naturalHeight || 720;
+  const imgWidth = box.width;
+  const imgHeight = box.height;
   canvas.width = imgWidth;
   canvas.height = imgHeight;
 
@@ -215,62 +224,46 @@ function drawTimestamp(imageElement, canvas, ctx, door, timestamp, timestampChec
   // CSS object-fit sizes this canvas the same way as the image underneath.
   canvas.style.transform = '';
   canvas.style.display = 'block';
-  imageElement.style.display = 'none';
+  if (imageElement.tagName !== 'VIDEO') imageElement.style.display = 'none';
 }
 // Enhanced image capture with Promise handling
 function getTimestampedImage(imageElement, door, timestamp, timestampCheckbox) {
-  console.log('getTimestampedImage called:', {
-    door,
-    timestamp: new Date(timestamp).toLocaleString(),
-    timestampEnabled: timestampCheckbox?.checked,
-    imageComplete: imageElement.complete,
-    naturalWidth: imageElement.naturalWidth,
-    naturalHeight: imageElement.naturalHeight,
-    currentSrc: imageElement.currentSrc ? imageElement.currentSrc.substring(0, 50) + '...' : 'no src'
-  });
-  // Create canvas with fallback dimensions
   const canvas = document.createElement('canvas');
-  const imgWidth = imageElement.naturalWidth || 1080;
-  const imgHeight = imageElement.naturalHeight || 720;
- 
-  canvas.width = imgWidth;
-  canvas.height = imgHeight;
   const ctx = canvas.getContext('2d');
- 
-  console.log(`Canvas created: ${canvas.width}x${canvas.height}`);
- 
-  // Wait for image to be fully loaded if needed
+
   return new Promise((resolve) => {
-    if (imageElement.complete && imageElement.naturalWidth > 0) {
-      // Image is ready, draw immediately
+    const draw = () => {
+      const box = mediaBox(imageElement);
+      canvas.width = box.width || 1080;
+      canvas.height = box.height || 720;
       drawImageToCanvas(ctx, imageElement, canvas, door, timestamp, timestampCheckbox, resolve);
-    } else {
-      // Image not ready, wait for load
-      console.log('Image not ready, waiting for load...');
-      const imgLoadHandler = () => {
-        imageElement.removeEventListener('load', imgLoadHandler);
-        drawImageToCanvas(ctx, imageElement, canvas, door, timestamp, timestampCheckbox, resolve);
-      };
-      imageElement.addEventListener('load', imgLoadHandler);
-     
-      // Fallback timeout in case load never fires
-      setTimeout(() => {
-        if (!imageElement.complete) {
-          console.warn('Image load timeout, using fallback');
-          // Draw a placeholder or use the current src if available
-          ctx.fillStyle = '#f0f0f0';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.fillStyle = '#999';
-          ctx.font = '30px Arial';
-          ctx.textAlign = 'center';
-          ctx.fillText('No Image', canvas.width / 2, canvas.height / 2);
-          // if (timestampCheckbox?.checked) {
-          //   addTimestampOverlay(ctx, door, timestamp);
-          // }
-          resolve(canvas.toDataURL('image/jpeg', 0.5)); // Improved fallback quality
-        }
-      }, 1000);
+    };
+    if (mediaBox(imageElement).ready) {
+      draw();
+      return;
     }
+
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      if (mediaBox(imageElement).ready) {
+        draw();
+        return;
+      }
+      canvas.width = 1080;
+      canvas.height = 720;
+      ctx.fillStyle = '#f0f0f0';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#999';
+      ctx.font = '30px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('No Image', canvas.width / 2, canvas.height / 2);
+      resolve(canvas.toDataURL('image/jpeg', 0.5));
+    };
+    const eventName = imageElement && imageElement.tagName === 'VIDEO' ? 'loadeddata' : 'load';
+    if (imageElement) imageElement.addEventListener(eventName, finish, { once: true });
+    setTimeout(finish, 1000);
   });
 }
 function drawImageToCanvas(ctx, imageElement, canvas, door, timestamp, timestampCheckbox, resolve) {
@@ -374,177 +367,372 @@ function updateTemperatureDisplay(data) {
     showTemperatureAlert(data);
   }
 }
-// WebSocket connections
-function connectCameraWebSocket(camera, ws, videoStream, canvas, ctx, timestampCheckbox, captureButton, toggleButton) {
-  let lastUpdate = 0;
-  let framesReceived = 0;
-  let connectionTime = Date.now();
-  const minFrameInterval = 132; // ~30 FPS
-  ws.binaryType = 'arraybuffer';
-  // Enable capture button after connection (even without frames)
- ws.onopen = () => {
-  console.log(`${camera} camera connected`);
-  framesReceived = 0;
-  invalidFrameCounts[camera] = 0;
-  reconnectAttempts[camera] = 0;
-  isPaused[camera] = false;
-
-  // Enable capture button
-  if (captureButton) {
-    captureButton.disabled = false;
-    captureButton.classList.remove('disabled');
-  }
-
-  // The form was restored from this browser. Send it once the socket is open
-  // so a restarted camera process matches the values on screen.
-  pushStoredCameraSettings(camera, ws);
-  if (!hasStoredCameraSettings(camera)) {
-    try {
-      ws.send(JSON.stringify({ action: 'get_config' }));
-    } catch (error) {
-      console.debug(`${camera} settings were not requested`);
-    }
-  }
-
-  showStatusMessage(`${camera} camera ready`, 800);
+// Each card plays a mediaMTX WebRTC path. Port 8889 plus the path is the reader
+// address; playback POSTs the SDP offer to that path with /whep appended.
+const STREAM_URLS_KEY = 'thermosquid.streamUrls';
+const DEFAULT_STREAM_URLS = {
+  front: 'http://192.168.1.37:8889/cam_ribbon',
+  back: 'http://192.168.1.37:8889/cam_usb'
 };
-  ws.onmessage = (event) => {
-    try {
-      if (typeof event.data === 'string') {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.action === 'config') adoptCameraConfig(camera, data);
-        } catch (error) {
-          console.debug(`${camera}: text message received`);
-        }
-        return;
-      }
-      const now = Date.now();
-      if (now - lastUpdate < minFrameInterval || isPaused[camera]) return;
-      lastUpdate = now;
-      const blob = new Blob([event.data], { type: 'image/jpeg' });
-     
-      // Relaxed size check - accept smaller frames
-      if (blob.size < 100) {
-        console.debug(`${camera}: frame too small (${blob.size} bytes)`);
-        return;
-      }
-      framesReceived++;
-      invalidFrameCounts[camera] = 0;
-      const url = URL.createObjectURL(blob);
-      videoStream.src = url;
-     
-      videoStream.onload = () => {
-        // Update last captured image
-        lastCapturedImages[camera] = {
-          door: camera,
-          image: url,
-          timestamp: now,
-          frames: framesReceived
-        };
-       
-        // Draw timestamp overlay if enabled
-        if (canvas && ctx && timestampCheckbox?.checked) {
-          drawTimestamp(videoStream, canvas, ctx, camera, now, timestampCheckbox);
-        } else {
-          videoStream.style.display = 'block';
-          if (canvas) canvas.style.display = 'none';
-        }
-       
-        // Clean up previous URL
-        if (videoStream.dataset.lastUrl && videoStream.dataset.lastUrl !== url) {
-          URL.revokeObjectURL(videoStream.dataset.lastUrl);
-        }
-        videoStream.dataset.lastUrl = url;
-       
-        // Ensure capture button stays enabled
-        if (captureButton) {
-          captureButton.disabled = false;
-          captureButton.classList.remove('disabled');
-        }
-      };
-     
-      videoStream.onerror = (error) => {
-        console.warn(`${camera}: image load failed`, error);
-        invalidFrameCounts[camera]++;
-      //  URL.revokeObjectURL(url);
-       
-        // // Only disable after multiple failures
-        // if (invalidFrameCounts[camera] > 10) {
-        //   if (captureButton) {
-        //     captureButton.disabled = true;
-        //     captureButton.classList.add('disabled');
-        //   }
-        //   showStatusMessage(`${camera} feed unstable`, 2000);
-        // }
-      };
-    } catch (err) {
-      console.warn(`${camera}: frame processing error`, err);
-      invalidFrameCounts[camera]++;
-    }
+const streamPlayers = {
+  front: { generation: 0, pc: null, sessionUrl: '', retryTimer: null },
+  back: { generation: 0, pc: null, sessionUrl: '', retryTimer: null }
+};
+let overlayStamp = 0;
+
+function videoFor(camera) {
+  return camera === 'front' ? frontVideoStream : backVideoStream;
+}
+
+function captureButtonFor(camera) {
+  return camera === 'front' ? captureFrontImageButton : captureBackImageButton;
+}
+
+function readStoredStreamUrls() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STREAM_URLS_KEY) || 'null');
+    if (!parsed || typeof parsed !== 'object') return { ...DEFAULT_STREAM_URLS };
+    return {
+      front: typeof parsed.front === 'string' ? parsed.front : DEFAULT_STREAM_URLS.front,
+      back: typeof parsed.back === 'string' ? parsed.back : DEFAULT_STREAM_URLS.back
+    };
+  } catch (error) {
+    return { ...DEFAULT_STREAM_URLS };
+  }
+}
+
+function saveStreamUrls() {
+  try {
+    localStorage.setItem(STREAM_URLS_KEY, JSON.stringify({
+      front: document.getElementById('front-stream-url').value.trim(),
+      back: document.getElementById('back-stream-url').value.trim()
+    }));
+  } catch (error) {
+    console.debug('Stream URLs were not stored');
+  }
+}
+
+function restoreStreamUrls() {
+  const stored = readStoredStreamUrls();
+  const front = document.getElementById('front-stream-url');
+  const back = document.getElementById('back-stream-url');
+  if (front) front.value = stored.front;
+  if (back) back.value = stored.back;
+}
+
+function streamPageUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `http://${raw}`;
+  let parsed;
+  try {
+    parsed = new URL(withScheme);
+  } catch (error) {
+    return null;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+  parsed.hash = '';
+  parsed.search = '';
+  let path = parsed.pathname.replace(/\/+$/, '');
+  if (path.endsWith('/whep')) path = path.slice(0, -5).replace(/\/+$/, '');
+  parsed.pathname = path || '/';
+  return parsed.toString();
+}
+
+function whepUrlFor(pageUrl) {
+  const parsed = new URL(pageUrl);
+  const path = parsed.pathname.replace(/\/+$/, '');
+  parsed.pathname = `${path}/whep`;
+  return parsed.toString();
+}
+
+function setStreamStatus(camera, text, kind) {
+  const el = document.getElementById(`${camera}-stream-status`);
+  if (!el) return;
+  el.hidden = !text;
+  el.textContent = text || '';
+  el.classList.toggle('is-error', kind === 'error');
+}
+
+function markStreamLive(camera) {
+  const previous = lastCapturedImages[camera];
+  lastCapturedImages[camera] = {
+    door: camera,
+    image: 'stream',
+    timestamp: Date.now(),
+    frames: Math.max(1, previous && previous.frames ? previous.frames : 1)
   };
-  ws.onclose = (event) => {
-    console.log(`${camera} camera disconnected (code: ${event.code})`);
-   
-    // Update status
-    const statusElement = document.getElementById(`${camera}-status`);
-    if (statusElement) {
-      statusElement.textContent = 'Disconnected';
-      statusElement.style.background = '#f8d7da';
-      statusElement.style.borderColor = '#f5c6cb';
-      statusElement.style.color = '#721c24';
+  const button = captureButtonFor(camera);
+  if (button) {
+    button.disabled = false;
+    button.classList.remove('disabled');
+  }
+  const video = videoFor(camera);
+  if (video) video.style.display = 'block';
+  setStreamStatus(camera, '');
+}
+
+function markStreamDown(camera) {
+  lastCapturedImages[camera] = null;
+}
+
+function waitForIceGathering(pc) {
+  if (pc.iceGatheringState === 'complete') return Promise.resolve();
+  return new Promise((resolve) => {
+    const finish = () => {
+      pc.removeEventListener('icegatheringstatechange', onChange);
+      clearTimeout(timer);
+      resolve();
+    };
+    const onChange = () => {
+      if (pc.iceGatheringState === 'complete') finish();
+    };
+    const timer = setTimeout(finish, 2000);
+    pc.addEventListener('icegatheringstatechange', onChange);
+  });
+}
+
+async function closeStreamSession(player) {
+  const sessionUrl = player.sessionUrl;
+  const pc = player.pc;
+  player.sessionUrl = '';
+  player.pc = null;
+  if (pc) {
+    pc.onconnectionstatechange = null;
+    pc.ontrack = null;
+    try { pc.close(); } catch (error) { /* already closed */ }
+  }
+  if (sessionUrl) {
+    try { await fetch(sessionUrl, { method: 'DELETE' }); } catch (error) { /* reader already gone */ }
+  }
+}
+
+function scheduleStreamRetry(camera, generation) {
+  const player = streamPlayers[camera];
+  clearTimeout(player.retryTimer);
+  player.retryTimer = setTimeout(() => {
+    if (player.generation !== generation) return;
+    const pageUrl = streamPageUrl(document.getElementById(`${camera}-stream-url`).value);
+    if (!pageUrl) return;
+    openStream(camera, generation, pageUrl);
+  }, 3000);
+}
+
+function attachModalStream(camera) {
+  const source = videoFor(camera);
+  if (!modalVideoStream || !source) return;
+  modalVideoStream.srcObject = source.srcObject || null;
+  modalVideoStream.muted = true;
+  if (!source.srcObject) return;
+  if (isPaused[camera]) modalVideoStream.pause();
+  else modalVideoStream.play().catch(() => {});
+}
+
+async function openStream(camera, generation, pageUrl) {
+  const player = streamPlayers[camera];
+  const video = videoFor(camera);
+  if (!video || player.generation !== generation) return;
+  player.connectId = (player.connectId || 0) + 1;
+  const connectId = player.connectId;
+  await closeStreamSession(player);
+  if (player.generation !== generation || player.connectId !== connectId) return;
+
+  setStreamStatus(camera, 'Connecting…');
+  const pc = new RTCPeerConnection();
+  player.pc = pc;
+  pc.addTransceiver('video', { direction: 'recvonly' });
+  const remoteStream = new MediaStream();
+  let gotTrack = false;
+  let gaveUp = false;
+
+  const giveUp = (message) => {
+    if (gaveUp || player.generation !== generation || player.connectId !== connectId) return;
+    gaveUp = true;
+    markStreamDown(camera);
+    setStreamStatus(camera, message, 'error');
+    scheduleStreamRetry(camera, generation);
+  };
+
+  const noteReady = () => {
+    if (player.generation !== generation || player.connectId !== connectId || video.videoWidth <= 0) return;
+    gotTrack = true;
+    if (!isPaused[camera]) video.play().catch(() => {});
+    markStreamLive(camera);
+    if (currentModalCamera === camera) attachModalStream(camera);
+  };
+  if (video._streamReady) {
+    video.removeEventListener('loadeddata', video._streamReady);
+    video.removeEventListener('resize', video._streamReady);
+  }
+  video._streamReady = noteReady;
+  video.addEventListener('loadeddata', noteReady);
+  video.addEventListener('resize', noteReady);
+
+  pc.ontrack = (event) => {
+    if (player.generation !== generation || player.connectId !== connectId) return;
+    if (!remoteStream.getTracks().includes(event.track)) remoteStream.addTrack(event.track);
+    video.srcObject = remoteStream;
+    video.muted = true;
+    video.playsInline = true;
+    video.style.display = 'block';
+    if (currentModalCamera === camera) attachModalStream(camera);
+    noteReady();
+  };
+
+  pc.onconnectionstatechange = () => {
+    if (player.generation !== generation || player.connectId !== connectId) return;
+    if (pc.connectionState === 'failed') {
+      giveUp('Stream disconnected. Retrying…');
+      return;
     }
-   
-    videoStream.src = '';
-    videoStream.style.display = 'none';
-   
+    if (pc.connectionState !== 'disconnected') return;
+    setTimeout(() => {
+      if (player.generation !== generation || player.connectId !== connectId) return;
+      if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+        giveUp('Stream disconnected. Retrying…');
+      }
+    }, 4000);
+  };
+
+  try {
+    const offer = await pc.createOffer();
+    if (player.generation !== generation || player.connectId !== connectId) return;
+    await pc.setLocalDescription(offer);
+    await waitForIceGathering(pc);
+    if (player.generation !== generation || player.connectId !== connectId) return;
+    const whepUrl = whepUrlFor(pageUrl);
+    const response = await fetch(whepUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/sdp' },
+      body: pc.localDescription.sdp
+    });
+    if (player.generation !== generation || player.connectId !== connectId) return;
+    if (!response.ok) throw new Error(`mediaMTX returned ${response.status}`);
+    const answer = await response.text();
+    const location = response.headers.get('Location');
+    if (location) player.sessionUrl = new URL(location, whepUrl).toString();
+    await pc.setRemoteDescription({ type: 'answer', sdp: answer });
+    setTimeout(() => {
+      if (gotTrack) return;
+      giveUp('No video from mediaMTX. Retrying…');
+    }, 15000);
+  } catch (error) {
+    if (player.generation !== generation || player.connectId !== connectId) return;
+    console.warn(`${camera} stream failed`, error);
+    await closeStreamSession(player);
+    giveUp('Cannot reach the stream. Retrying…');
+  }
+}
+
+async function beginStream(camera) {
+  const player = streamPlayers[camera];
+  player.generation += 1;
+  const generation = player.generation;
+  clearTimeout(player.retryTimer);
+  player.retryTimer = null;
+  const video = videoFor(camera);
+  if (video) {
+    video.pause();
+    video.srcObject = null;
+  }
+  const canvas = camera === 'front' ? frontCanvas : backCanvas;
+  if (canvas) canvas.style.display = 'none';
+  if (currentModalCamera === camera && modalVideoStream) {
+    modalVideoStream.pause();
+    modalVideoStream.srcObject = null;
+  }
+  await closeStreamSession(player);
+  if (player.generation !== generation) return;
+
+  const input = document.getElementById(`${camera}-stream-url`);
+  const pageUrl = streamPageUrl(input ? input.value : '');
+  if (pageUrl == null) {
+    markStreamDown(camera);
+    setStreamStatus(camera, 'Stream URL is not valid', 'error');
+    return;
+  }
+  if (!pageUrl) {
+    markStreamDown(camera);
+    setStreamStatus(camera, 'Enter a stream URL');
+    return;
+  }
+  if (typeof RTCPeerConnection !== 'function') {
+    markStreamDown(camera);
+    setStreamStatus(camera, 'This browser cannot play WebRTC', 'error');
+    return;
+  }
+  await openStream(camera, generation, pageUrl);
+}
+
+function bindStreamField(camera) {
+  const input = document.getElementById(`${camera}-stream-url`);
+  if (!input) return;
+  input.addEventListener('change', () => {
+    saveStreamUrls();
+    beginStream(camera);
+  });
+  input.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    input.blur();
+  });
+}
+
+function paintCameraOverlay(camera, video, canvas, ctx, checkbox, paused) {
+  if (!checkbox || !checkbox.checked) {
     if (canvas) canvas.style.display = 'none';
-    if (videoStream.dataset.lastUrl) {
-      URL.revokeObjectURL(videoStream.dataset.lastUrl);
-      delete videoStream.dataset.lastUrl;
+    return;
+  }
+  if (paused && canvas && canvas.style.display === 'block') return;
+  drawTimestamp(video, canvas, ctx, camera, Date.now(), checkbox);
+}
+
+function paintTimestampOverlays() {
+  paintCameraOverlay('front', frontVideoStream, frontCanvas, frontCtx, frontTimestampCheckbox, isPaused.front);
+  paintCameraOverlay('back', backVideoStream, backCanvas, backCtx, backTimestampCheckbox, isPaused.back);
+  if (!modal || modal.style.display !== 'flex' || !currentModalCamera || !modalVideoStream || !modalCanvas || !modalCtx) return;
+  const stampOn = { checked: Boolean(modalTimestampEnabled) };
+  paintCameraOverlay(currentModalCamera, modalVideoStream, modalCanvas, modalCtx, stampOn, isPaused[currentModalCamera]);
+}
+
+function overlayLoop(now) {
+  if (now - overlayStamp > 120) {
+    overlayStamp = now;
+    paintTimestampOverlays();
+    ['front', 'back'].forEach((camera) => {
+      const video = videoFor(camera);
+      const shot = lastCapturedImages[camera];
+      if (!shot || isPaused[camera] || !mediaBox(video).ready) return;
+      shot.timestamp = Date.now();
+      shot.frames = Math.max(1, shot.frames || 1);
+    });
+  }
+  requestAnimationFrame(overlayLoop);
+}
+
+function setCameraPaused(camera, paused) {
+  isPaused[camera] = paused;
+  if (currentModalCamera === camera) modalIsPaused = paused;
+  const video = videoFor(camera);
+  if (video) {
+    if (paused) video.pause();
+    else if (video.srcObject) video.play().catch(() => {});
+  }
+  if (currentModalCamera === camera && modalVideoStream && modalVideoStream.srcObject) {
+    if (paused) modalVideoStream.pause();
+    else modalVideoStream.play().catch(() => {});
+  }
+  updateToggleButtonUI(camera);
+  const liveToggle = document.getElementById('modal-toggle-btn');
+  if (currentModalCamera === camera && liveToggle) {
+    const span = liveToggle.querySelector('span');
+    const icon = liveToggle.querySelector('i');
+    if (span && icon) {
+      span.textContent = paused ? 'Resume' : 'Pause';
+      icon.className = paused ? 'fa-solid fa-play' : 'fa-solid fa-pause';
     }
-   
-    // Disable capture button
-    // if (captureButton) {
-    //   captureButton.disabled = true;
-    //   captureButton.classList.add('disabled');
-    // }
-   
-    // Start reconnection
-    if (reconnectAttempts[camera] < maxReconnectAttempts) {
-      const delay = reconnectDelay * Math.pow(1.5, reconnectAttempts[camera]);
-      setTimeout(() => {
-        reconnectAttempts[camera]++;
-        console.log(`Reconnecting ${camera} camera (attempt ${reconnectAttempts[camera]})`);
-        if (camera === 'front') {
-          frontCameraWs = new WebSocket(`ws://${host}:8081/ws`);
-          connectCameraWebSocket('front', frontCameraWs, frontVideoStream, frontCanvas, frontCtx, frontTimestampCheckbox, captureFrontImageButton, toggleFrontStreamButton);
-        } else {
-          backCameraWs = new WebSocket(`ws://${host}:8082/ws`);
-          connectCameraWebSocket('back', backCameraWs, backVideoStream, backCanvas, backCtx, backTimestampCheckbox, captureBackImageButton, toggleBackStreamButton);
-        }
-      }, delay);
-    } else {
-      showStatusMessage(`${camera} camera offline`, 3000);
-    }
-  };
-  ws.onerror = (error) => {
-    console.warn(`${camera} camera connection error`);
-   
-    // Update status
-    const statusElement = document.getElementById(`${camera}-status`);
-    if (statusElement) {
-      statusElement.textContent = 'Error';
-      statusElement.style.background = '#fff3cd';
-      statusElement.style.borderColor = '#ffeaa7';
-      statusElement.style.color = '#856404';
-    }
-   
-    if (captureButton) {
-      captureButton.disabled = true;
-      captureButton.classList.add('disabled');
-    }
-  };
+  }
+  paintTimestampOverlays();
 }
 
 let imageListWaiter = null;
@@ -1165,7 +1353,7 @@ function requestNotificationPermission() {
 // Camera modal functionality
 function openCameraModal(camera) {
   currentModalCamera = camera;
-  modalIsPaused = false;
+  modalIsPaused = Boolean(isPaused[camera]);
   const sourceTimestamp = camera === 'front' ? frontTimestampCheckbox : backTimestampCheckbox;
   modalTimestampEnabled = Boolean(sourceTimestamp?.checked);
  
@@ -1188,23 +1376,10 @@ function openCameraModal(camera) {
       });
     }
   }
-  // Set up modal video stream
   if (modalVideoStream && currentModalCamera) {
-    const sourceStream = currentModalCamera === 'front' ? frontVideoStream : backVideoStream;
-   
-    // Add onload handler to modal image (for initial and future src changes)
-    modalVideoStream.onload = () => {
-      updateModalTimestampOverlay();
-    };
-   
-    // Set src and style
-    modalVideoStream.src = sourceStream.src;
+    attachModalStream(currentModalCamera);
     modalVideoStream.style.display = 'block';
-   
-    // Trigger initial update (in case image is already complete)
-    if (modalVideoStream.complete) {
-      updateModalTimestampOverlay();
-    }
+    updateModalTimestampOverlay();
   }
   // Modal capture button
   if (modalCaptureBtn) {
@@ -1239,18 +1414,14 @@ function openCameraModal(camera) {
     modalToggleBtn.replaceWith(modalToggleBtn.cloneNode(true));
     const newToggleBtn = document.getElementById('modal-toggle-btn');
     newToggleBtn.onclick = () => {
-      if (currentModalCamera) {
-        modalIsPaused = !modalIsPaused;
-        isPaused[currentModalCamera] = modalIsPaused; // Sync with main pause state
-       
-        const span = newToggleBtn.querySelector('span');
-        const icon = newToggleBtn.querySelector('i');
-        if (span && icon) {
-          span.textContent = modalIsPaused ? 'Resume' : 'Pause';
-          icon.className = modalIsPaused ? 'fa-solid fa-play' : 'fa-solid fa-pause';
-        }
-      }
+      if (currentModalCamera) setCameraPaused(currentModalCamera, !isPaused[currentModalCamera]);
     };
+    const span = newToggleBtn.querySelector('span');
+    const icon = newToggleBtn.querySelector('i');
+    if (span && icon) {
+      span.textContent = modalIsPaused ? 'Resume' : 'Pause';
+      icon.className = modalIsPaused ? 'fa-solid fa-play' : 'fa-solid fa-pause';
+    }
   }
   // Close modal handlers
   if (closeModalBtn) {
@@ -1319,25 +1490,6 @@ function updateModalTimestampOverlay() {
     modalCtx.font = originalFont;
   }
 }
-// Listen for new frames in modal
-function setupModalFrameListener() {
-  const originalOnLoad = frontVideoStream.onload;
-  frontVideoStream.onload = function() {
-    if (currentModalCamera === 'front' && modal.style.display === 'flex') {
-      modalVideoStream.src = this.src; // Update modal src to new frame (will trigger modal's onload)
-    }
-    if (originalOnLoad) originalOnLoad.call(this);
-  };
- 
-  const originalBackOnLoad = backVideoStream.onload;
-  backVideoStream.onload = function() {
-    if (currentModalCamera === 'back' && modal.style.display === 'flex') {
-      modalVideoStream.src = this.src; // Update modal src to new frame (will trigger modal's onload)
-    }
-    if (originalBackOnLoad) originalBackOnLoad.call(this);
-  };
-}
-
 function getLocalWindowsTime() {
   const now = new Date();
   const year   = now.getFullYear();
@@ -1479,8 +1631,9 @@ if (syncTimeBtn) {
     });
    
   });
-  // Listen for new frames in modal
-  setupModalFrameListener();
+  [frontTimestampCheckbox, backTimestampCheckbox].forEach((box) => {
+    if (box) box.addEventListener('change', paintTimestampOverlays);
+  });
   // Camera controls
   document.querySelectorAll('.control-btn').forEach(button => {
     button.addEventListener('click', (event) => {
@@ -1531,24 +1684,22 @@ if (syncTimeBtn) {
           showStatusMessage('Capture failed', 2000);
         }
       } else if (action === 'toggle') {
-        isPaused[camera] = !isPaused[camera];
-        updateToggleButtonUI(camera);
-        //showStatusMessage(isPaused[camera] ? `${camera} paused` : `${camera} resumed`, 1000);
+        setCameraPaused(camera, !isPaused[camera]);
       } else if (action === 'settings') {
         toggleSettingsMenu(camera);
       }
     });
   });
+  restoreStreamUrls();
+  bindStreamField('front');
+  bindStreamField('back');
+  beginStream('front');
+  beginStream('back');
+  requestAnimationFrame(overlayLoop);
   // Connect WebSockets
   setTimeout(() => {
     connectImageWebSocket();
-    if (frontVideoStream) {
-      connectCameraWebSocket('front', frontCameraWs, frontVideoStream, frontCanvas, frontCtx, frontTimestampCheckbox, captureFrontImageButton, toggleFrontStreamButton);
-    }
-    if (backVideoStream) {
-      connectCameraWebSocket('back', backCameraWs, backVideoStream, backCanvas, backCtx, backTimestampCheckbox, captureBackImageButton, toggleBackStreamButton);
-    }
-   
+
     // Initialize temperature widget after a short delay
     setTimeout(() => {
       initializeTemperatureWidget();
@@ -1558,13 +1709,21 @@ if (syncTimeBtn) {
 });
 // Cleanup
 window.addEventListener('beforeunload', () => {
-  // Clean up WebSocket URLs
   Object.values(lastCapturedImages).forEach(image => {
-    if (image && image.image) {
+    if (image && typeof image.image === 'string' && image.image.startsWith('blob:')) {
       URL.revokeObjectURL(image.image);
     }
   });
- 
+  ['front', 'back'].forEach((camera) => {
+    const player = streamPlayers[camera];
+    player.generation += 1;
+    clearTimeout(player.retryTimer);
+    if (player.pc) {
+      try { player.pc.close(); } catch (error) { /* already closed */ }
+    }
+    if (player.sessionUrl) fetch(player.sessionUrl, { method: 'DELETE' }).catch(() => {});
+  });
+
   if (temperatureWs) {
     temperatureWs.close();
   }
@@ -2010,7 +2169,7 @@ function applyCameraSettings(camera) {
 
   const cameraWs = camera === 'front' ? frontCameraWs : backCameraWs;
   if (!cameraWs || cameraWs.readyState !== WebSocket.OPEN) {
-    showStatusMessage(`${camera} camera not connected`, 2000);
+    if (cameraWs) showStatusMessage(`${camera} camera not connected`, 2000);
     return;
   }
   if (lastSentCameraSettings[camera] === payload) return;

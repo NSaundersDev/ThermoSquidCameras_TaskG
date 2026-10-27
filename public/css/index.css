@@ -1110,6 +1110,53 @@ width: 100%;
   font-size: 0.78rem;
   font-weight: 400;
 }
+.stream-url-field {
+  display: flex;
+  flex: 1 1 100%;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.stream-url-field input {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0.28rem 0.45rem;
+  border: 1px solid #adb5bd;
+  border-radius: 6px;
+  background: #fff;
+  color: #212529;
+  font-family: Consolas, "Segoe UI Mono", monospace;
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+.stream-status {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 1rem;
+  color: #dee2e6;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  pointer-events: none;
+}
+.stream-status[hidden] {
+  display: none;
+}
+.stream-status.is-error {
+  color: #ffb4b4;
+}
 /* Overlaid capture button. Do not scale or use transition:all here:
    transforming an icon font makes the camera glyph flash a box with an X. */
 .control-btn.primary {
