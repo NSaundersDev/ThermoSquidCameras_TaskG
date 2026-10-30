@@ -67,7 +67,7 @@ function readTemperature(item) {
   if (typeof item === 'number') return Number.isFinite(item) ? Number(item.toFixed(1)) : null;
   if (typeof item !== 'string') return null;
   let text = item.trim().replace(/°/g, '');
-  if (!text || /^(nan|none|null|open|error|n\/a|---|inf|-inf|infinity|-infinity)$/i.test(text)) return null;
+  if (!text || /^(nan|none|null|open|error|n\/a|na|---|inf|-inf|infinity|-infinity)$/i.test(text)) return null;
   text = text.replace(',', '.').replace(/\s*[cCfF]$/, '').trim();
   const value = Number(text);
   return Number.isFinite(value) ? Number(value.toFixed(1)) : null;
@@ -77,7 +77,7 @@ function isTempLike(item) {
   if (item == null || typeof item === 'number') return true;
   if (typeof item !== 'string') return false;
   const text = item.trim();
-  if (!text || /^(nan|none|null|open|error|n\/a|---|inf|-inf|infinity|-infinity)$/i.test(text)) return true;
+  if (!text || /^(nan|none|null|open|error|n\/a|na|---|inf|-inf|infinity|-infinity)$/i.test(text)) return true;
   return /^-?\d+(?:[.,]\d+)?\s*°?\s*[cCfF]?$/.test(text);
 }
 
@@ -99,10 +99,22 @@ function formatStamp(value) {
   return null;
 }
 
+function daqTemperatures(value) {
+  // Temperature DAQ shot replies:
+  // 9 fields: timestamp, TC1..TC8
+  // 12 fields: timestamp, TC1..TC8, relay, control, shot
+  // 13 fields: timestamp, elapsed seconds, TC1..TC8, relay, control, shot
+  if (value.length === 13) return value.slice(2, 10);
+  if (value.length === 12 || value.length === 9) return value.slice(1, 9);
+  return null;
+}
+
 function readingFromArray(value) {
   let at = null;
   let plain = null;
   let list = null;
+  const daq = daqTemperatures(value);
+  if (daq && daq.every(isTempLike)) list = daq;
   for (const item of value) {
     if (!list && Array.isArray(item) && item.every(isTempLike)) {
       list = item;
