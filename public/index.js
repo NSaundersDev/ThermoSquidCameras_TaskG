@@ -670,6 +670,7 @@ function bindStreamField(camera) {
   input.addEventListener('change', () => {
     saveStreamUrls();
     beginStream(camera);
+    connectTemperatureWebSocket();
   });
   input.addEventListener('keydown', (event) => {
     if (event.key !== 'Enter') return;
@@ -814,57 +815,73 @@ function connectImageWebSocket() {
     console.warn('Image service error');
   };
 }
-// Temperature WebSocket connection
+// The temperature widget reads the video Pi named by the stream URL.
+let temperatureReconnectTimer = null;
+
+function temperatureServiceUrl() {
+  const stored = readStoredStreamUrls();
+  const page = streamPageUrl(stored.front) || streamPageUrl(stored.back);
+  let hostname = '192.168.1.37';
+  if (page) {
+    try {
+      hostname = new URL(page).hostname || hostname;
+    } catch (error) {
+      hostname = '192.168.1.37';
+    }
+  }
+  return `ws://${hostname}:${TEMPERATURE_CONFIG.WS_PORT}/ws`;
+}
+
 function connectTemperatureWebSocket() {
-  if (temperatureWs && temperatureWs.readyState === WebSocket.OPEN) return;
- 
-  temperatureWs = new WebSocket(`ws://${host}:8083/ws`);
- 
-  temperatureWs.onopen = () => {
+  const url = temperatureServiceUrl();
+  if (temperatureWs && temperatureWs.url === url && (temperatureWs.readyState === WebSocket.OPEN || temperatureWs.readyState === WebSocket.CONNECTING)) return;
+  clearTimeout(temperatureReconnectTimer);
+  const previous = temperatureWs;
+  const socket = new WebSocket(url);
+  temperatureWs = socket;
+  if (previous) {
+    previous.onclose = null;
+    previous.onerror = null;
+    try { previous.close(); } catch (error) { /* already closed */ }
+  }
+
+  socket.onopen = () => {
+    if (temperatureWs !== socket) return;
     console.log('Temperature WebSocket connected');
     if (temperatureElements.status) {
       temperatureElements.status.textContent = 'Connected';
       temperatureElements.status.className = 'temp-status ok';
     }
     showStatusMessage('Temperature monitoring started', 1500);
-   
-    // Request initial temperature
-    if (temperatureWs.readyState === WebSocket.OPEN) {
-      temperatureWs.send(JSON.stringify({
-        type: 'request_temperature'
-      }));
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: 'request_temperature' }));
     }
   };
-  temperatureWs.onmessage = (event) => {
+  socket.onmessage = (event) => {
+    if (temperatureWs !== socket) return;
     try {
       const message = JSON.parse(event.data);
-     
       if (message.type === 'temperature' || message.type === 'temperature_update') {
         updateTemperatureDisplay(message.data);
-       
-        // Store latest temperature
         window.latestTemperature = message.data;
       }
-     
       console.debug('Temperature message:', message);
     } catch (error) {
       console.warn('Invalid temperature message:', error.message);
     }
   };
-  temperatureWs.onclose = (event) => {
+  socket.onclose = (event) => {
+    if (temperatureWs !== socket) return;
     console.log('Temperature WebSocket disconnected:', event.code);
     if (temperatureElements.status) {
       temperatureElements.status.textContent = 'Disconnected';
       temperatureElements.status.className = 'temp-status error';
     }
-   
-    // Auto-reconnect after delay
-    setTimeout(() => {
-      connectTemperatureWebSocket();
-    }, 3000);
+    temperatureReconnectTimer = setTimeout(connectTemperatureWebSocket, 3000);
   };
-  temperatureWs.onerror = (error) => {
-    console.error('Temperature WebSocket error:', error);
+  socket.onerror = () => {
+    if (temperatureWs !== socket) return;
+    console.error('Temperature WebSocket error');
     if (temperatureElements.status) {
       temperatureElements.status.textContent = 'Connection error';
       temperatureElements.status.className = 'temp-status error';

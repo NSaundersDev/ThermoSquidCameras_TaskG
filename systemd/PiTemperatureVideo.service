@@ -1,0 +1,13 @@
+[Unit]
+Description=Imaging DAQ video Pi temperature
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/thermosquid/pi_temperature.py
+WorkingDirectory=/opt/thermosquid
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
