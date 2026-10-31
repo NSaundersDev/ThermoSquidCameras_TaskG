@@ -2582,20 +2582,47 @@ function formatElapsed(ms) {
   return `${minutes}:${String(seconds).padStart(2, '0')}.${tenths}`;
 }
 
-function sessionImageBaseName(sessionName, cameraLabel, inputNumber, when, shotIndex, total) {
-  const date = when instanceof Date ? when : new Date();
-  const datePart = `${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}${String(date.getFullYear()).slice(-2)}`;
-  const count = String(inputNumber).padStart(2, '0');
-  const shot = total > 1 ? `--${String(shotIndex).padStart(2, '0')}` : '';
+function sessionDatePart(when) {
+  const date = when instanceof Date ? when : new Date(when);
+  return `${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}${String(date.getFullYear()).slice(-2)}`;
+}
+
+function fitSessionFileTokens(sessionName, frontLabel, backLabel) {
   let sessionToken = fileToken(sessionName, 'Session');
-  let cameraToken = fileToken(cameraLabel, 'Camera');
-  const fixed = datePart.length + count.length + shot.length + 6;
-  const room = 80 - fixed;
-  if (sessionToken.length + cameraToken.length > room) {
-    sessionToken = sessionToken.slice(0, Math.max(1, room - 1));
-    cameraToken = cameraToken.slice(0, Math.max(1, room - sessionToken.length));
+  let frontToken = fileToken(frontLabel, 'Front');
+  let backToken = fileToken(backLabel, 'Back');
+  const room = 68;
+  while (sessionToken.length + frontToken.length > room || sessionToken.length + backToken.length > room) {
+    const sessionLimited = sessionToken.length > 1
+      && sessionToken.length >= frontToken.length
+      && sessionToken.length >= backToken.length;
+    if (sessionLimited) {
+      sessionToken = sessionToken.slice(0, -1);
+      continue;
+    }
+    if (sessionToken.length + frontToken.length > room && frontToken.length > 1) {
+      frontToken = frontToken.slice(0, -1);
+      continue;
+    }
+    if (sessionToken.length + backToken.length > room && backToken.length > 1) {
+      backToken = backToken.slice(0, -1);
+      continue;
+    }
+    if (sessionToken.length > 1) {
+      sessionToken = sessionToken.slice(0, -1);
+      continue;
+    }
+    break;
   }
-  return `${datePart}--${sessionToken}--${cameraToken}--${count}${shot}`;
+  return { sessionToken, frontToken, backToken };
+}
+
+function sessionImageBaseName(sessionName, cameraLabel, inputNumber, when, shotIndex, total, peerLabel) {
+  const datePart = sessionDatePart(when);
+  const count = String(inputNumber).padStart(2, '0');
+  const shotNumber = total > 1 ? `${count}${String(shotIndex).padStart(2, '0')}` : count;
+  const fitted = fitSessionFileTokens(sessionName, cameraLabel, peerLabel || cameraLabel);
+  return `FT${datePart}${fitted.sessionToken}${fitted.frontToken}${shotNumber}`;
 }
 
 function readSecondsField(id) {
@@ -2759,18 +2786,9 @@ function buildSessionCsv() {
 
 function sessionDataIdentity() {
   const when = new Date(sessionState.startedAt);
-  const datePart = `${String(when.getMonth() + 1).padStart(2, '0')}${String(when.getDate()).padStart(2, '0')}${String(when.getFullYear()).slice(-2)}`;
-  const cameraLabel = sessionState.names && sessionState.names.front
-    ? sessionState.names.front
-    : DEFAULT_CAMERA_NAMES.front;
-  const sample = sessionImageBaseName(sessionState.name, cameraLabel, 1, when, 1, 1);
-  const prefix = `${datePart}--`;
-  let sessionToken = fileToken(sessionState.name, 'Session');
-  if (sample.startsWith(prefix) && sample.endsWith('--01')) {
-    const middle = sample.slice(prefix.length, sample.length - 4);
-    const splitAt = middle.lastIndexOf('--');
-    if (splitAt > 0) sessionToken = middle.slice(0, splitAt);
-  }
+  const datePart = sessionDatePart(when);
+  const names = sessionState.names || DEFAULT_CAMERA_NAMES;
+  const { sessionToken } = fitSessionFileTokens(sessionState.name, names.front, names.back);
   return {
     key: `${datePart}--${sessionToken}`,
     fileBase: `${datePart}--${sessionToken}--shot-data`
@@ -2802,9 +2820,20 @@ function listedFileName(img) {
 
 function listedSessionKey(fileName) {
   const base = String(fileName).replace(/\.(jpe?g|png)$/i, '');
-  const match = base.match(/^(\d{6})--(.+?)--(.+?)--(\d{2})(?:--(\d{2}))?$/);
-  if (!match) return '';
-  return `${match[1]}--${match[2]}`;
+  const older = base.match(/^(\d{6})--(.+?)--(.+?)--(\d{2})(?:--(\d{2}))?$/);
+  if (older) return `${older[1]}--${older[2]}`;
+  if (!(sessionState.startedAt > 0)) return '';
+  const names = sessionState.names || DEFAULT_CAMERA_NAMES;
+  const { sessionToken, frontToken, backToken } = fitSessionFileTokens(sessionState.name, names.front, names.back);
+  const datePart = sessionDatePart(sessionState.startedAt);
+  const prefix = `FT${datePart}${sessionToken}`;
+  if (!base.startsWith(prefix)) return '';
+  const rest = base.slice(prefix.length);
+  const matched = [frontToken, backToken].some((camera) => {
+    if (!camera || !rest.startsWith(camera)) return false;
+    return /^\d{2}(\d{2})?$/.test(rest.slice(camera.length));
+  });
+  return matched ? `${datePart}--${sessionToken}` : '';
 }
 
 function listedSessionDataKey(fileName) {
@@ -2816,11 +2845,10 @@ function listedSessionDataKey(fileName) {
 function compareListedImages(a, b) {
   const rank = (img) => {
     const base = listedFileName(img).replace(/\.(jpe?g|png)$/i, '');
-    const match = base.match(/^(\d{6})--(.+?)--(.+?)--(\d{2})(?:--(\d{2}))?$/);
-    return {
-      count: match ? match[4] : '99',
-      shot: match && match[5] ? match[5] : ''
-    };
+    const older = base.match(/^(\d{6})--(.+?)--(.+?)--(\d{2})(?:--(\d{2}))?$/);
+    if (older) return { count: older[4], shot: older[5] || '' };
+    const shotDigits = base.match(/^FT\d{6}.+?(\d+)$/);
+    return { count: shotDigits ? shotDigits[1] : '99', shot: '' };
   };
   const left = rank(a);
   const right = rank(b);
@@ -3035,7 +3063,8 @@ async function captureSessionPair(job) {
     const lastImage = lastCapturedImages[door];
     const videoStream = door === 'front' ? frontVideoStream : backVideoStream;
     const timestampCheckbox = door === 'front' ? frontTimestampCheckbox : backTimestampCheckbox;
-    const baseName = sessionImageBaseName(job.sessionName, job.names[door], job.inputNumber, job.when, job.shotIndex, job.total);
+    const peerLabel = door === 'front' ? job.names.back : job.names.front;
+    const baseName = sessionImageBaseName(job.sessionName, job.names[door], job.inputNumber, job.when, job.shotIndex, job.total, peerLabel);
     if (sessionState.shotsCancelled) return;
     if (!lastImage || !lastImage.image || lastImage.frames === 0 || !videoStream || !imageWs || imageWs.readyState !== WebSocket.OPEN) {
       showCaptureConfirm(door, '', false);

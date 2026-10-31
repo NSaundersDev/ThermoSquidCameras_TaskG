@@ -155,6 +155,78 @@ function parseModernSession(fileName) {
   };
 }
 
+function parseFtSession(fileName) {
+  const match = imageBaseName(fileName).match(/^FT(\d{6})(.+)(\d{2})$/);
+  if (!match || !match[2]) return null;
+  return {
+    date: match[1],
+    body: match[2],
+    count: match[3],
+    shot: ''
+  };
+}
+
+function sharedTextPrefix(left, right) {
+  let index = 0;
+  const length = Math.min(left.length, right.length);
+  while (index < length && left[index] === right[index]) index += 1;
+  return left.slice(0, index);
+}
+
+function groupFtSessions(items) {
+  const byDate = new Map();
+  items.forEach((item) => {
+    const list = byDate.get(item.parsed.date) || [];
+    list.push(item);
+    byDate.set(item.parsed.date, list);
+  });
+
+  const groups = [];
+  byDate.forEach((dateItems, date) => {
+    const bodies = [...new Set(dateItems.map((item) => item.parsed.body))];
+    const parent = new Map(bodies.map((body) => [body, body]));
+    const find = (body) => {
+      let root = body;
+      while (parent.get(root) !== root) root = parent.get(root);
+      parent.set(body, root);
+      return root;
+    };
+    for (let i = 0; i < bodies.length; i += 1) {
+      for (let j = i + 1; j < bodies.length; j += 1) {
+        const prefix = sharedTextPrefix(bodies[i], bodies[j]);
+        if (!prefix || prefix.length === bodies[i].length || prefix.length === bodies[j].length) continue;
+        const left = bodies[i].slice(prefix.length);
+        const right = bodies[j].slice(prefix.length);
+        if (left.startsWith('-') || right.startsWith('-')) continue;
+        parent.set(find(bodies[j]), find(bodies[i]));
+      }
+    }
+    const clusters = new Map();
+    bodies.forEach((body) => {
+      const root = find(body);
+      const list = clusters.get(root) || [];
+      list.push(body);
+      clusters.set(root, list);
+    });
+    const sessionOf = new Map();
+    clusters.forEach((list) => {
+      const session = list.slice(1).reduce((prefix, body) => sharedTextPrefix(prefix, body), list[0]).replace(/-+$/, '');
+      list.forEach((body) => sessionOf.set(body, session || body));
+    });
+    const grouped = new Map();
+    dateItems.forEach((item) => {
+      const session = sessionOf.get(item.parsed.body);
+      const key = `${date}--${session}`;
+      const group = grouped.get(key) || { key, date, session, images: [] };
+      item.parsed = { ...item.parsed, session, key };
+      group.images.push(item);
+      grouped.set(key, group);
+    });
+    grouped.forEach((group) => groups.push(group));
+  });
+  return groups;
+}
+
 function parseLegacySession(fileName) {
   const base = imageBaseName(fileName);
   if (/^\d{13}-/.test(base)) return null;
@@ -250,6 +322,11 @@ function classifyImages(images) {
       modern.set(parsed.key, group);
       return;
     }
+    const ft = parseFtSession(name);
+    if (ft) {
+      legacy.push({ ...img, parsed: ft, ft: true });
+      return;
+    }
     const old = parseLegacySession(name);
     if (old) {
       legacy.push({ ...img, parsed: old });
@@ -257,7 +334,9 @@ function classifyImages(images) {
     }
     loose.push(img);
   });
-  return { groups: [...modern.values(), ...groupLegacySessions(legacy)], loose };
+  const ftItems = legacy.filter((item) => item.ft);
+  const olderItems = legacy.filter((item) => !item.ft);
+  return { groups: [...modern.values(), ...groupFtSessions(ftItems), ...groupLegacySessions(olderItems)], loose };
 }
 
 function formatSessionDate(date) {
