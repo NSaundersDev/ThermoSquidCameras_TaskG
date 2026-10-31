@@ -66,13 +66,10 @@ function selectedSessionKey() {
 function fetchImages() {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
-  const dateEl = document.getElementById('date-filter');
-  const date = selectedSessionKey() || !dateEl ? '' : dateEl.value;
-
   ws.send(JSON.stringify({
     action: 'list_images',
     door: null,
-    date: date || null
+    date: null
   }));
 }
 
@@ -156,13 +153,20 @@ function parseModernSession(fileName) {
 }
 
 function parseFtSession(fileName) {
-  const match = imageBaseName(fileName).match(/^FT(\d{6})(.+)(\d{2})$/);
+  const match = imageBaseName(fileName).match(/^FT(\d{6})(.+)$/);
   if (!match || !match[2]) return null;
+  const rest = match[2];
+  let shotNumber = '';
+  if (/[^\d]\d{4}$/.test(rest)) shotNumber = rest.slice(-4);
+  else if (/\d{2}$/.test(rest)) shotNumber = rest.slice(-2);
+  else return null;
+  const body = rest.slice(0, -shotNumber.length);
+  if (!body) return null;
   return {
     date: match[1],
-    body: match[2],
-    count: match[3],
-    shot: ''
+    body,
+    count: shotNumber.slice(0, 2),
+    shot: shotNumber.length > 2 ? shotNumber.slice(2) : ''
   };
 }
 
@@ -336,7 +340,16 @@ function classifyImages(images) {
   });
   const ftItems = legacy.filter((item) => item.ft);
   const olderItems = legacy.filter((item) => !item.ft);
-  return { groups: [...modern.values(), ...groupFtSessions(ftItems), ...groupLegacySessions(olderItems)], loose };
+  const grouped = new Map(modern);
+  groupFtSessions(ftItems).forEach((group) => {
+    const existing = grouped.get(group.key);
+    if (!existing) {
+      grouped.set(group.key, group);
+      return;
+    }
+    existing.images.push(...group.images);
+  });
+  return { groups: [...grouped.values(), ...groupLegacySessions(olderItems)], loose };
 }
 
 function formatSessionDate(date) {
@@ -462,9 +475,28 @@ function entryTime(entry) {
   return Math.max(...images.map((img) => Number(img.timestamp) || 0));
 }
 
+function selectedDateCompact() {
+  const dateEl = document.getElementById('date-filter');
+  const match = dateEl && dateEl.value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return '';
+  return `${match[2]}${match[3]}${match[1].slice(-2)}`;
+}
+
+function imageOnSelectedDate(img) {
+  if (selectedSessionKey()) return true;
+  const dateEl = document.getElementById('date-filter');
+  if (!dateEl || !dateEl.value) return true;
+  const name = imageFileName(img);
+  const compact = selectedDateCompact();
+  if (name.startsWith(`FT${compact}`) || name.startsWith(`${compact}--`) || name.startsWith(`${compact}-`)) return true;
+  if (/^FT\d{6}/.test(name) || /^\d{6}--/.test(name) || /^\d{6}-/.test(name)) return false;
+  const folderDate = String(img.path || '').split('/')[3] || '';
+  return folderDate === dateEl.value;
+}
+
 function galleryEntries(images) {
   const key = selectedSessionKey();
-  const classified = classifyImages(images);
+  const classified = classifyImages(images.filter(imageOnSelectedDate));
   if (key) {
     const group = classified.groups.find((item) => item.key === key);
     if (!group) return [];
